@@ -1,19 +1,143 @@
 """Database CRUD operations"""
+from typing import List, Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, func, Date
+from datetime import datetime, date
 from . import models
+from ..core.security import get_password_hash, verify_password
 
-def create_student(db: Session, student_data):
+# Teacher CRUD
+def create_teacher(db: Session, teacher_data: dict) -> models.Teacher:
+    hashed_password = get_password_hash(teacher_data["password"])
+    db_teacher = models.Teacher(
+        teacher_id=teacher_data["teacher_id"],
+        full_name=teacher_data["full_name"],
+        email=teacher_data["email"],
+        password_hash=hashed_password,
+        role=teacher_data.get("role", "teacher")
+    )
+    db.add(db_teacher)
+    db.commit()
+    db.refresh(db_teacher)
+    return db_teacher
+
+def get_teacher_by_email(db: Session, email: str) -> Optional[models.Teacher]:
+    return db.query(models.Teacher).filter(models.Teacher.email == email).first()
+
+def get_teacher_by_id(db: Session, teacher_id: int) -> Optional[models.Teacher]:
+    return db.query(models.Teacher).filter(models.Teacher.id == teacher_id).first()
+
+def get_teachers(db: Session, skip: int = 0, limit: int = 100) -> List[models.Teacher]:
+    return db.query(models.Teacher).offset(skip).limit(limit).all()
+
+def authenticate_teacher(db: Session, email: str, password: str) -> Optional[models.Teacher]:
+    teacher = get_teacher_by_email(db, email)
+    if not teacher or not verify_password(password, teacher.password_hash):
+        return None
+    return teacher
+
+# Class CRUD
+def create_class(db: Session, class_data: dict) -> models.Class:
+    db_class = models.Class(**class_data)
+    db.add(db_class)
+    db.commit()
+    db.refresh(db_class)
+    return db_class
+
+def get_class_by_id(db: Session, class_id: int) -> Optional[models.Class]:
+    return db.query(models.Class).filter(models.Class.id == class_id).first()
+
+def get_classes(db: Session, teacher_id: Optional[int] = None) -> List[models.Class]:
+    query = db.query(models.Class)
+    if teacher_id:
+        query = query.filter(models.Class.teacher_id == teacher_id)
+    return query.all()
+
+# Student CRUD
+def create_student(db: Session, student_data: dict) -> models.Student:
     db_student = models.Student(**student_data)
     db.add(db_student)
     db.commit()
     db.refresh(db_student)
     return db_student
 
-def get_students(db: Session):
-    return db.query(models.Student).all()
+def get_student_by_id(db: Session, student_id: int) -> Optional[models.Student]:
+    return db.query(models.Student).filter(models.Student.id == student_id).first()
 
-def create_attendance(db: Session, attendance_data):
-    db_attendance = models.Attendance(**attendance_data)
+def get_student_by_student_id(db: Session, student_id: str) -> Optional[models.Student]:
+    return db.query(models.Student).filter(models.Student.student_id == student_id).first()
+
+def get_students(db: Session, class_id: Optional[int] = None) -> List[models.Student]:
+    query = db.query(models.Student)
+    if class_id:
+        query = query.filter(models.Student.class_id == class_id)
+    return query.all()
+
+def update_student_face_enrolled(db: Session, student_id: int, enrolled: bool) -> models.Student:
+    student = get_student_by_id(db, student_id)
+    if student:
+        student.face_enrolled = enrolled
+        db.commit()
+        db.refresh(student)
+    return student
+
+# Face Embedding CRUD
+def create_face_embedding(db: Session, student_id: int, embedding: str) -> models.FaceEmbedding:
+    # Delete existing embedding if any
+    db.query(models.FaceEmbedding).filter(models.FaceEmbedding.student_id == student_id).delete()
+    
+    db_embedding = models.FaceEmbedding(
+        student_id=student_id,
+        embedding=embedding
+    )
+    db.add(db_embedding)
+    db.commit()
+    db.refresh(db_embedding)
+    return db_embedding
+
+def get_face_embedding(db: Session, student_id: int) -> Optional[models.FaceEmbedding]:
+    return db.query(models.FaceEmbedding).filter(models.FaceEmbedding.student_id == student_id).first()
+
+def get_all_face_embeddings_by_class(db: Session, class_id: int) -> List[models.FaceEmbedding]:
+    return db.query(models.FaceEmbedding).join(models.Student).filter(
+        models.Student.class_id == class_id
+    ).all()
+
+# Attendance CRUD
+def create_attendance(db: Session, student_id: int, class_id: int, confidence_score: float = None) -> models.Attendance:
+    db_attendance = models.Attendance(
+        student_id=student_id,
+        class_id=class_id,
+        confidence_score=confidence_score
+    )
     db.add(db_attendance)
     db.commit()
+    db.refresh(db_attendance)
     return db_attendance
+
+def get_attendance_today(db: Session, class_id: Optional[int] = None) -> List[models.Attendance]:
+    today = date.today()
+    query = db.query(models.Attendance).filter(
+        func.date(models.Attendance.marked_at) == today
+    )
+    if class_id:
+        query = query.filter(models.Attendance.class_id == class_id)
+    return query.all()
+
+def get_attendance_by_class(db: Session, class_id: int, date_filter: Optional[date] = None) -> List[models.Attendance]:
+    query = db.query(models.Attendance).filter(models.Attendance.class_id == class_id)
+    if date_filter:
+        query = query.filter(func.date(models.Attendance.marked_at) == date_filter)
+    return query.all()
+
+def check_attendance_exists(db: Session, student_id: int, class_id: int, check_date: date = None) -> bool:
+    if not check_date:
+        check_date = date.today()
+    
+    return db.query(models.Attendance).filter(
+        and_(
+            models.Attendance.student_id == student_id,
+            models.Attendance.class_id == class_id,
+            func.date(models.Attendance.marked_at) == check_date
+        )
+    ).first() is not None

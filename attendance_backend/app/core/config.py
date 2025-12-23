@@ -2,8 +2,21 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
+    # Database
     database_url: str = "sqlite:///./attendance.db"
-    secret_key: str = "your-secret-key"
+    
+    # Security
+    secret_key: str = "your-super-secret-key-change-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    
+    # Face Recognition
+    face_similarity_threshold: float = 0.6
+    insightface_model_name: str = "buffalo_l"
+    
+    # App
+    app_name: str = "Face Recognition Attendance System"
+    debug: bool = False
     
     class Config:
         env_file = ".env"

@@ -1,29 +1,72 @@
 """Database ORM models"""
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean, Float
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from .base import Base
-
-class Student(Base):
-    __tablename__ = "students"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    student_id = Column(String, unique=True, index=True)
-    name = Column(String)
-    class_name = Column(String)
-    face_embedding = Column(Text)
 
 class Teacher(Base):
     __tablename__ = "teachers"
     
     id = Column(Integer, primary_key=True, index=True)
-    teacher_id = Column(String, unique=True, index=True)
-    name = Column(String)
-    email = Column(String)
+    teacher_id = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, default="teacher")  # admin, teacher
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    classes = relationship("Class", back_populates="teacher")
+
+class Class(Base):
+    __tablename__ = "classes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    class_name = Column(String, nullable=False)
+    class_code = Column(String, unique=True, index=True, nullable=False)
+    teacher_id = Column(Integer, ForeignKey("teachers.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    teacher = relationship("Teacher", back_populates="classes")
+    students = relationship("Student", back_populates="class_obj")
+
+class Student(Base):
+    __tablename__ = "students"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String, nullable=False)
+    class_id = Column(Integer, ForeignKey("classes.id"), nullable=False)
+    face_enrolled = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    class_obj = relationship("Class", back_populates="students")
+    face_embedding = relationship("FaceEmbedding", back_populates="student", uselist=False)
+    attendance_records = relationship("Attendance", back_populates="student")
+
+class FaceEmbedding(Base):
+    __tablename__ = "face_embeddings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), unique=True, nullable=False)
+    embedding = Column(Text, nullable=False)  # JSON serialized embedding
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    student = relationship("Student", back_populates="face_embedding")
 
 class Attendance(Base):
     __tablename__ = "attendance"
     
     id = Column(Integer, primary_key=True, index=True)
-    student_id = Column(String, ForeignKey("students.student_id"))
-    timestamp = Column(DateTime)
-    status = Column(String)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+    class_id = Column(Integer, ForeignKey("classes.id"), nullable=False)
+    marked_at = Column(DateTime(timezone=True), server_default=func.now())
+    confidence_score = Column(Float, nullable=True)
+    
+    # Relationships
+    student = relationship("Student", back_populates="attendance_records")
+    class_obj = relationship("Class")

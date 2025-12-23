@@ -1,11 +1,19 @@
 """Face recognition request/response schemas"""
 from pydantic import BaseModel
+from typing import Optional
 
 class FaceRegisterResponse(BaseModel):
     success: bool
     message: str
+    student_id: Optional[int] = None
 
 class FaceVerifyResponse(BaseModel):
-    verified: bool
-    student_id: str = None
-    confidence: float = None
+    success: bool
+    message: str
+    student_id: Optional[int] = None
+    student_name: Optional[str] = None
+    confidence_score: Optional[float] = None
+    attendance_marked: Optional[bool] = None
+
+class FaceVerifyRequest(BaseModel):
+    class_id: int
