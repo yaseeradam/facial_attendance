@@ -142,7 +142,7 @@ class _AttendanceHistoryScreenState extends ConsumerState<AttendanceHistoryScree
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isAbsent ? Colors.grey : theme.colorScheme.onBackground)),
+                    Text(name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isAbsent ? Colors.grey : theme.colorScheme.onSurface)),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),

@@ -41,9 +41,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             child: Column(
               children: [
-                CircleAvatar(
+                const CircleAvatar(
                   radius: 48,
-                  backgroundImage: const NetworkImage("https://lh3.googleusercontent.com/aida-public/AB6AXuB_CObvLVwn3h3IscRNJrSKPvAtAM4PhAX0oN3vCrICB9t8JQzgQAaJb_obCGDzyYzihr5pFuy8sLr1VnPVHvVFOWwthgoreKyNMjCBQG49HhPDj0B_mS8iN9txove_JuQdZ_RZSnKur0Zk3C1bql1Tsu26E23wgGmFPHx33JOfseYDSbAAm3oRttwcjEdVd7l4HUAof0QXh__B89ZsZpK1qX9qFzWzDBM0yyuR6ZsmdNr8mq7D08yDZ143cw0di6YvZQny4p9DGyE"),
+                  backgroundImage: NetworkImage("https://lh3.googleusercontent.com/aida-public/AB6AXuB_CObvLVwn3h3IscRNJrSKPvAtAM4PhAX0oN3vCrICB9t8JQzgQAaJb_obCGDzyYzihr5pFuy8sLr1VnPVHvVFOWwthgoreKyNMjCBQG49HhPDj0B_mS8iN9txove_JuQdZ_RZSnKur0Zk3C1bql1Tsu26E23wgGmFPHx33JOfseYDSbAAm3oRttwcjEdVd7l4HUAof0QXh__B89ZsZpK1qX9qFzWzDBM0yyuR6ZsmdNr8mq7D08yDZ143cw0di6YvZQny4p9DGyE"),
                 ),
                 const SizedBox(height: 12),
                 Text("John Doe", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),

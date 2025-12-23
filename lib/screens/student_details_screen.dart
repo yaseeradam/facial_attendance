@@ -142,7 +142,7 @@ class StudentDetailsScreen extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             side: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
-                            foregroundColor: theme.colorScheme.onBackground,
+                            foregroundColor: theme.colorScheme.onSurface,
                           ),
                         ),
                       ),

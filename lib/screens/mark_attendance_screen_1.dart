@@ -241,9 +241,9 @@ class _MarkAttendanceScreen1State extends ConsumerState<MarkAttendanceScreen1> w
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.edit, size: 18, color: theme.colorScheme.onBackground),
+                                  Icon(Icons.edit, size: 18, color: theme.colorScheme.onSurface),
                                   const SizedBox(width: 8),
-                                  Text("Manual Entry", style: TextStyle(color: theme.colorScheme.onBackground)),
+                                  Text("Manual Entry", style: TextStyle(color: theme.colorScheme.onSurface)),
                                 ],
                               ),
                             ),
@@ -329,7 +329,7 @@ class _MarkAttendanceScreen1State extends ConsumerState<MarkAttendanceScreen1> w
           RichText(
             text: TextSpan(
               children: [
-                TextSpan(text: value, style: TextStyle(color: theme.colorScheme.onBackground, fontSize: 20, fontWeight: FontWeight.bold)),
+                TextSpan(text: value, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
                 if (suffix.isNotEmpty) TextSpan(text: " $suffix", style: const TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),

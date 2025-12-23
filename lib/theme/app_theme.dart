@@ -17,8 +17,7 @@ class AppTheme {
     colorScheme: const ColorScheme.light(
       primary: primary,
       surface: surfaceLight,
-      background: backgroundLight,
-      onBackground: Color(0xFF111418), // text-slate-900
+      onSurface: Color(0xFF111418), // text-slate-900
     ),
     textTheme: GoogleFonts.lexendTextTheme().copyWith(
       displayLarge: GoogleFonts.lexend(
@@ -42,14 +41,13 @@ class AppTheme {
     colorScheme: const ColorScheme.dark(
       primary: primary,
       surface: surfaceDark,
-      background: backgroundDark,
-      onBackground: Colors.white,
+      onSurface: Colors.white,
     ),
     textTheme: GoogleFonts.lexendTextTheme(ThemeData.dark().textTheme).copyWith(
       displayLarge: GoogleFonts.lexend(
           color: Colors.white, fontWeight: FontWeight.bold),
       bodyLarge: GoogleFonts.notoSans(color: Colors.white),
-      bodyMedium: GoogleFonts.notoSans(color: Color(0xFF94A3B8)), // text-slate-400
+      bodyMedium: GoogleFonts.notoSans(color: const Color(0xFF94A3B8)), // text-slate-400
     ),
     appBarTheme: const AppBarTheme(
         backgroundColor: surfaceDark,

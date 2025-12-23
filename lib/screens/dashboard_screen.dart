@@ -7,6 +7,8 @@ import 'settings_screen.dart';
 import 'admin_profile_setup_screen.dart';
 import 'attendance_history_screen.dart';
 import 'student_list_screen.dart';
+import 'class_management_screen.dart';
+import 'teacher_management_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -144,7 +146,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           label: "Total Students",
                           value: "450",
                           bg: theme.cardColor,
-                          textColor: theme.colorScheme.onBackground,
+                          textColor: theme.colorScheme.onSurface,
                           isOutlined: true,
                         ),
                         const SizedBox(width: 16),
@@ -156,7 +158,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           label: "Departments",
                           value: "12",
                           bg: theme.cardColor,
-                          textColor: theme.colorScheme.onBackground,
+                          textColor: theme.colorScheme.onSurface,
                           isOutlined: true,
                         ),
                       ],
@@ -186,7 +188,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterStudentScreen()))),
                       _buildActionCard(context, "Scan Face", Icons.center_focus_strong, Colors.green,
                         () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarkAttendanceScreen1()))),
-                      _buildActionCard(context, "Reports", Icons.bar_chart, Colors.orange,
+                      _buildActionCard(context, "Classes", Icons.class_, Colors.purple,
+                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ClassManagementScreen()))),
+                      _buildActionCard(context, "Teachers", Icons.school, Colors.orange,
+                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherManagementScreen()))),
+                      _buildActionCard(context, "Reports", Icons.bar_chart, Colors.teal,
                         () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()))),
                       _buildActionCard(context, "System", Icons.settings, Colors.grey,
                         () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))),
@@ -313,7 +319,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: Icon(icon, color: color, size: 32),
             ),
             const SizedBox(height: 12),
-            Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onBackground)),
+            Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
           ],
         ),
       ),

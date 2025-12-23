@@ -73,7 +73,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               
               // Date Filter
               DropdownButtonFormField<String>(
-                value: _dateFilter,
+                initialValue: _dateFilter,
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.calendar_month),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -95,7 +95,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _deptFilter,
+                      initialValue: _deptFilter,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
@@ -195,7 +195,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Widget _buildStatCard(BuildContext context, String label, String value, String? trend, IconData icon, bool isPrimary, {Color? iconColor}) {
     final theme = Theme.of(context);
     final bgColor = isPrimary ? theme.colorScheme.primary : theme.cardColor;
-    final textColor = isPrimary ? Colors.white : theme.colorScheme.onBackground;
+    final textColor = isPrimary ? Colors.white : theme.colorScheme.onSurface;
     
     return Container(
       padding: const EdgeInsets.all(16),

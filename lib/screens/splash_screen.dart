@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'login_screen.dart';
+import '../services/storage_service.dart';
+import '../services/api_service.dart';
+import '../providers/app_providers.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -13,6 +15,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
+  String _loadingText = "Initializing...";
 
   @override
   void initState() {
@@ -25,14 +28,39 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
 
-    // Simulate loading
-    Future.delayed(const Duration(seconds: 3), () {
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    try {
+      setState(() => _loadingText = "Loading storage...");
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      setState(() => _loadingText = "Checking authentication...");
+      final token = await StorageService.getToken();
+      
+      setState(() => _loadingText = "Loading preferences...");
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      setState(() => _loadingText = "Ready!");
+      await Future.delayed(const Duration(milliseconds: 500));
+      
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
+        if (token != null) {
+          ApiService.setToken(token);
+          ref.read(authProvider.notifier).login(token, {});
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        } else {
+          Navigator.pushReplacementNamed(context, '/login');
+        }
       }
-    });
+    } catch (e) {
+      setState(() => _loadingText = "Error loading app");
+      await Future.delayed(const Duration(seconds: 1));
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    }
   }
 
   @override
@@ -159,7 +187,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        "Loading modules...",
+                        _loadingText,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: isDark ? Colors.grey[500] : Colors.grey[400],
                         ),

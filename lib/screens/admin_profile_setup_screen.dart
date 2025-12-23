@@ -157,7 +157,7 @@ class AdminProfileSetupScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      Switch(value: true, onChanged: (v) {}, activeColor: theme.colorScheme.primary),
+                      Switch(value: true, onChanged: (v) {}, activeThumbColor: theme.colorScheme.primary),
                     ],
                   ),
                  ),

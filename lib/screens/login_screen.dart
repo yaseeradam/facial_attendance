@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dashboard_screen.dart';
+import '../services/api_service.dart';
+import '../services/validation_service.dart';
+import '../providers/app_providers.dart';
+import '../widgets/common_widgets.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -13,6 +16,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -21,10 +25,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => const DashboardScreen()),
-    );
+  Future<void> _handleLogin() async {
+    final emailError = ValidationService.validateEmail(_emailController.text);
+    final passwordError = ValidationService.validatePassword(_passwordController.text);
+    
+    if (emailError != null || passwordError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(emailError ?? passwordError!), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    
+    final result = await ApiService.login(_emailController.text, _passwordController.text);
+    
+    setState(() => _isLoading = false);
+    
+    if (result['success']) {
+      ref.read(authProvider.notifier).login(result['data']['access_token'], result['data']['user'] ?? {});
+      Navigator.pushReplacementNamed(context, '/dashboard');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['error']), backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override
@@ -126,7 +151,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               style: theme.textTheme.displaySmall?.copyWith(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onBackground,
+                                color: theme.colorScheme.onSurface,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -195,14 +220,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                             const SizedBox(height: 24),
                             // Login Button
-                            FilledButton(
+                            LoadingButton(
+                              text: "Log In",
                               onPressed: _handleLogin,
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                backgroundColor: theme.colorScheme.primary,
-                              ),
-                              child: const Text("Log In", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              isLoading: _isLoading,
+                              icon: Icons.login,
                             ),
                             const SizedBox(height: 16),
                             Row(
@@ -219,7 +241,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             OutlinedButton.icon(
                               onPressed: () {},
                               icon: Icon(Icons.face, color: theme.colorScheme.primary),
-                              label: Text("Login with Face ID", style: TextStyle(color: theme.colorScheme.onBackground)),
+                              label: Text("Login with Face ID", style: TextStyle(color: theme.colorScheme.onSurface)),
                               style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
