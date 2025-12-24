@@ -1,12 +1,62 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'student_details_screen.dart';
+import 'register_student_screen.dart';
+import '../services/api_service.dart';
 
-class StudentListScreen extends ConsumerWidget {
+class StudentListScreen extends ConsumerStatefulWidget {
   const StudentListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StudentListScreen> createState() => _StudentListScreenState();
+}
+
+class _StudentListScreenState extends ConsumerState<StudentListScreen> {
+  List<Map<String, dynamic>> _students = [];
+  bool _isLoading = true;
+  String _searchQuery = '';
+  String _filterStatus = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStudents();
+  }
+
+  Future<void> _loadStudents() async {
+    setState(() => _isLoading = true);
+    final result = await ApiService.getStudents();
+    if (result['success']) {
+      setState(() {
+        _students = List<Map<String, dynamic>>.from(result['data'] ?? []);
+        _isLoading = false;
+      });
+    } else {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'] ?? 'Failed to load students'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredStudents {
+    return _students.where((student) {
+      final name = student['name']?.toString().toLowerCase() ?? '';
+      final studentId = student['student_id']?.toString().toLowerCase() ?? '';
+      final matchesSearch = name.contains(_searchQuery.toLowerCase()) || 
+                           studentId.contains(_searchQuery.toLowerCase());
+      
+      if (_filterStatus == 'all') return matchesSearch;
+      if (_filterStatus == 'registered') return matchesSearch && student['face_encoding'] != null;
+      if (_filterStatus == 'pending') return matchesSearch && student['face_encoding'] == null;
+      return matchesSearch;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -19,20 +69,20 @@ class StudentListScreen extends ConsumerWidget {
                 floating: true,
                 pinned: true,
                 snap: false,
-                title: const Column(
+                title: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                     Text("Students", style: TextStyle(fontWeight: FontWeight.bold)),
-                     Text("Manage face data and attendance", style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal)),
+                    const Text("Students", style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text("${_students.length} students registered", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal)),
                   ],
                 ),
                 actions: [
                   IconButton.filledTonal(
-                    onPressed: () {},
-                    icon: const Icon(Icons.filter_list),
-                    style: IconButton.styleFrom(
-                      backgroundColor: theme.cardColor,
-                    ),
+                    onPressed: _loadStudents,
+                    icon: _isLoading 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.refresh),
+                    style: IconButton.styleFrom(backgroundColor: theme.cardColor),
                   ),
                   const SizedBox(width: 16),
                 ],
@@ -41,9 +91,10 @@ class StudentListScreen extends ConsumerWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: TextField(
+                      onChanged: (value) => setState(() => _searchQuery = value),
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.search),
-                        hintText: "Search by name, ID, or class...",
+                        hintText: "Search by name or ID...",
                         filled: true,
                         fillColor: theme.cardColor,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -54,32 +105,65 @@ class StudentListScreen extends ConsumerWidget {
                 ),
               ),
               SliverToBoxAdapter(
-                 child: SingleChildScrollView(
-                   scrollDirection: Axis.horizontal,
-                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                   child: Row(
-                     children: [
-                       _buildChip(context, "All Students", true),
-                       const SizedBox(width: 8),
-                       _buildChip(context, "Registered", false),
-                       const SizedBox(width: 8),
-                       _buildChip(context, "Pending Face Data", false),
-                       const SizedBox(width: 8),
-                       _buildChip(context, "Class A", false),
-                     ],
-                   ),
-                 ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      _buildChip(context, "All Students", _filterStatus == 'all', () => setState(() => _filterStatus = 'all')),
+                      const SizedBox(width: 8),
+                      _buildChip(context, "Registered", _filterStatus == 'registered', () => setState(() => _filterStatus = 'registered')),
+                      const SizedBox(width: 8),
+                      _buildChip(context, "Pending Face", _filterStatus == 'pending', () => setState(() => _filterStatus = 'pending')),
+                    ],
+                  ),
+                ),
               ),
-              SliverList(
-                delegate: SliverChildListDelegate([
-                  _buildStudentCard(context, "Jane Doe", "ID: 2023001 • Class 3A", "Registered", Colors.blue, "https://lh3.googleusercontent.com/aida-public/AB6AXuDregapwWFizo_NQyT5_HtbKQQTXG-XamiNH3qpqa_nSNtQJSrqNdlwCMzYn3di0WzXXWDz12QHMZ0F2_ZjNLiZ9VE359ORmS_DfXrfJSSTg2nb9gotkDgSrjUkQu5JuzHnkBf_leBuNKpXR_z8OoVvfMnYlN77G9gxRblYmpzXcxCZEffg_rUl2dvOJTxk3NWHyK627ZLT6q8skFwRg1bBIxsZoaufMiuWpuTIZLfYgcorRNabxJZc4gSe6m78HZKcJqQgnQuurvo"),
-                  _buildStudentCard(context, "John Smith", "ID: 2023002 • Class 3A", "Pending", Colors.orange, null),
-                  _buildStudentCard(context, "Robert Fox", "ID: 2023045 • Class 3B", "Registered", Colors.blue, "https://lh3.googleusercontent.com/aida-public/AB6AXuAtugTlKnbb4thb3Rc1U2e7bvoTrYLfKdwK9CHmzKT6Gulm3CBwIT6zclUOKTiN1G3Roexcx_vcmdjoY9gCc8YhUz7naz5Y73X2R1zzFqI0phYovfH7l8z2LcRJuxUuWDEbiW6AJXkavzU44G-R7UKN_BImfLQO4Pz2gCb-w9kBDvsw5zBlqmVYf5W2BOXKVsrP2XgoQtbQZXatkp-g6egAMUoWo9qMcV9JAu2Jkh3_yfA7HiQ3Iuo9pcIlwrhk_EbXHrmFacWnHXI"),
-                  _buildStudentCard(context, "Esther Howard", "ID: 2023012 • Class 3A", "Registered", Colors.blue, "https://lh3.googleusercontent.com/aida-public/AB6AXuA_DIAklXCa4g-T6AQ80h6DX2xIcIVhnjE0IzBVgXw6qNCSwFkz9jc7SGO_d8qcMYI4MtTLxbfFFif0QAVabk_12wHz_n_Bl38IEcvYeERn1tHJsvwLzHPgC29eFvpLj3gYpP_7s2WkCRgvzNm9SUtDzJtm8YCY6pYCFZstFArxSKYy6zl_Ipvdw-m-MxlE1N29JYSTZu9qFrQoH-YJR_-Os7eLNweek4jMbBlPZBMZ1PeGhMKLH1uycu-c2OyIjKIYvAC0RCfvYfI"),
-                  _buildStudentCard(context, "Albert Flores", "ID: 2023088 • Class 3C", "Pending", Colors.orange, null),
-                  const SizedBox(height: 100),
-                ]),
-              ),
+              if (_isLoading)
+                const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_filteredStudents.isEmpty)
+                SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text('No students found', style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterStudentScreen())),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add First Student'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      if (index == _filteredStudents.length) {
+                        return const SizedBox(height: 100);
+                      }
+                      final student = _filteredStudents[index];
+                      final hasFace = student['face_encoding'] != null;
+                      return _buildStudentCard(
+                        context,
+                        student['name'] ?? 'Unknown',
+                        "ID: ${student['student_id']} • ${student['class_name'] ?? 'No Class'}",
+                        hasFace ? "Registered" : "Pending",
+                        hasFace ? Colors.green : Colors.orange,
+                        student['photo_path'],
+                        student,
+                      );
+                    },
+                    childCount: _filteredStudents.length + 1,
+                  ),
+                ),
             ],
           ),
           
@@ -87,7 +171,10 @@ class StudentListScreen extends ConsumerWidget {
             bottom: 90,
             right: 16,
             child: FloatingActionButton(
-              onPressed: () {},
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterStudentScreen()));
+                _loadStudents();
+              },
               backgroundColor: theme.colorScheme.primary,
               child: const Icon(Icons.add, color: Colors.white),
             ),
@@ -97,23 +184,26 @@ class StudentListScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildChip(BuildContext context, String label, bool isSelected) {
-     final theme = Theme.of(context);
-    return Chip(
-      label: Text(label, style: TextStyle(color: isSelected ? Colors.white : theme.colorScheme.onSurface)),
-      backgroundColor: isSelected ? theme.colorScheme.primary : theme.cardColor,
-      side: BorderSide.none,
-      shape: const StadiumBorder(),
-    ); 
+  Widget _buildChip(BuildContext context, String label, bool isSelected, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Chip(
+        label: Text(label, style: TextStyle(color: isSelected ? Colors.white : theme.colorScheme.onSurface)),
+        backgroundColor: isSelected ? theme.colorScheme.primary : theme.cardColor,
+        side: BorderSide.none,
+        shape: const StadiumBorder(),
+      ),
+    );
   }
 
-  Widget _buildStudentCard(BuildContext context, String name, String subtitle, String status, Color statusColor, String? imageUrl) {
+  Widget _buildStudentCard(BuildContext context, String name, String subtitle, String status, Color statusColor, String? imageUrl, Map<String, dynamic> student) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
     return InkWell(
       onTap: () {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StudentDetailsScreen()));
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => StudentDetailsScreen(student: student)));
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -131,9 +221,9 @@ class StudentListScreen extends ConsumerWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.grey[200],
-                image: imageUrl != null ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover) : null,
+                image: imageUrl != null ? DecorationImage(image: NetworkImage('${ApiService.baseUrl}/uploads/$imageUrl'), fit: BoxFit.cover) : null,
               ),
-              child: imageUrl == null ? const Center(child: Icon(Icons.person, color: Colors.grey)) : null,
+              child: imageUrl == null ? Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: theme.colorScheme.primary))) : null,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -146,7 +236,7 @@ class StudentListScreen extends ConsumerWidget {
                       Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                        decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
                         child: Text(status, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
                       ),
                     ],

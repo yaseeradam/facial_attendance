@@ -6,7 +6,7 @@ from datetime import datetime
 class ClassCreate(BaseModel):
     class_name: str
     class_code: str
-    teacher_id: int
+    teacher_id: Optional[int] = None
 
 class ClassResponse(BaseModel):
     id: int

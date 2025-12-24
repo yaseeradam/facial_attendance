@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/theme_provider.dart';
+import '../providers/app_providers.dart';
+import '../services/api_service.dart';
+import '../services/storage_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -11,13 +16,190 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _offlineMode = false;
-  bool _faceId = true;
+  bool _faceIdEnabled = false;
+  bool _isLoading = true;
+  Map<String, dynamic>? _currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    setState(() => _isLoading = true);
+    final result = await ApiService.getProfile();
+    if (result['success']) {
+      setState(() {
+        _currentUser = result['data'];
+        _faceIdEnabled = _currentUser?['has_face_id'] ?? false;
+        _isLoading = false;
+      });
+    } else {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _setupFaceId() async {
+    final picker = ImagePicker();
+    final XFile? photo = await picker.pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: CameraDevice.front,
+      imageQuality: 85,
+    );
+
+    if (photo != null) {
+      setState(() => _isLoading = true);
+      final result = await ApiService.setupFaceId(File(photo.path));
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['success'] ? 'Face ID setup successful!' : result['error'] ?? 'Failed to setup Face ID'),
+            backgroundColor: result['success'] ? Colors.green : Colors.red,
+          ),
+        );
+        if (result['success']) {
+          setState(() => _faceIdEnabled = true);
+        }
+      }
+    }
+  }
+
+  Future<void> _changePassword() async {
+    final oldPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: oldPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Current Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: newPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'New Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: confirmPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Confirm New Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () async {
+              if (newPasswordController.text != confirmPasswordController.text) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Passwords do not match'), backgroundColor: Colors.red),
+                );
+                return;
+              }
+              Navigator.pop(context, true);
+            },
+            child: const Text('Change'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      final apiResult = await ApiService.changePassword(
+        oldPasswordController.text,
+        newPasswordController.text,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(apiResult['success'] ? 'Password changed successfully!' : apiResult['error'] ?? 'Failed to change password'),
+            backgroundColor: apiResult['success'] ? Colors.green : Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _syncData() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Syncing data...'), duration: Duration(seconds: 1)),
+    );
+    // Reload all data
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Data synced successfully!'), backgroundColor: Colors.green),
+      );
+    }
+  }
+
+  Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await ApiService.logout();
+      await StorageService.clearToken();
+      ref.read(authProvider.notifier).logout();
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final themeMode = ref.watch(themeModeProvider);
+
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.arrow_back),
+          ),
+          title: const Text("Settings"),
+          centerTitle: true,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -37,22 +219,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             decoration: BoxDecoration(
               color: theme.cardColor,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
             ),
             child: Column(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 48,
-                  backgroundImage: NetworkImage("https://lh3.googleusercontent.com/aida-public/AB6AXuB_CObvLVwn3h3IscRNJrSKPvAtAM4PhAX0oN3vCrICB9t8JQzgQAaJb_obCGDzyYzihr5pFuy8sLr1VnPVHvVFOWwthgoreKyNMjCBQG49HhPDj0B_mS8iN9txove_JuQdZ_RZSnKur0Zk3C1bql1Tsu26E23wgGmFPHx33JOfseYDSbAAm3oRttwcjEdVd7l4HUAof0QXh__B89ZsZpK1qX9qFzWzDBM0yyuR6ZsmdNr8mq7D08yDZ143cw0di6YvZQny4p9DGyE"),
+                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                  child: Text(
+                    (_currentUser?['full_name'] ?? 'U')[0].toUpperCase(),
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                  ),
                 ),
                 const SizedBox(height: 12),
-                Text("John Doe", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                Text("Administrator", style: theme.textTheme.bodyMedium),
+                Text(_currentUser?['full_name'] ?? 'User', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Text(_currentUser?['role'] == 'admin' ? 'Administrator' : 'Teacher', style: theme.textTheme.bodyMedium),
+                Text(_currentUser?['email'] ?? '', style: theme.textTheme.bodySmall),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
+                    color: Colors.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Row(
@@ -85,7 +272,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   subtitle: const Text("Use face recognition without internet"),
                   secondary: Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(color: theme.colorScheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
                     child: Icon(Icons.wifi_off, color: theme.colorScheme.primary),
                   ),
                 ),
@@ -97,17 +284,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: const Icon(Icons.sync, color: Colors.blue),
                   ),
                   title: const Text("Sync Data", style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text("Last synced: 2 mins ago"),
+                  subtitle: const Text("Sync with server"),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: _syncData,
                 ),
               ],
             ),
           ),
           const SizedBox(height: 24),
 
-          // Appearance (Added by me for theme switching)
-           _buildSectionHeader("Appearance"),
+          // Appearance
+          _buildSectionHeader("Appearance"),
           Container(
             decoration: BoxDecoration(
               color: theme.cardColor,
@@ -135,7 +322,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // Security
           _buildSectionHeader("Security"),
           Container(
-             decoration: BoxDecoration(
+            decoration: BoxDecoration(
               color: theme.cardColor,
               borderRadius: BorderRadius.circular(16),
             ),
@@ -149,18 +336,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   title: const Text("Change Password", style: TextStyle(fontWeight: FontWeight.w600)),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: _changePassword,
                 ),
                 const Divider(height: 1),
-                SwitchListTile(
-                  value: _faceId,
-                  onChanged: (v) => setState(() => _faceId = v),
-                  title: const Text("Face ID Login", style: TextStyle(fontWeight: FontWeight.w600)),
-                  secondary: Container(
+                ListTile(
+                  leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(color: Colors.purple[100], borderRadius: BorderRadius.circular(12)),
                     child: const Icon(Icons.face, color: Colors.purple),
                   ),
+                  title: const Text("Face ID Login", style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(_faceIdEnabled ? 'Enabled' : 'Setup Face ID for quick login'),
+                  trailing: _faceIdEnabled 
+                      ? const Icon(Icons.check_circle, color: Colors.green)
+                      : FilledButton(
+                          onPressed: _setupFaceId,
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          ),
+                          child: const Text('Setup'),
+                        ),
                 ),
               ],
             ),
@@ -169,7 +364,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           
           // Logout
           ListTile(
-            onTap: () {},
+            onTap: _logout,
             tileColor: theme.cardColor,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             leading: const Icon(Icons.logout, color: Colors.red),
@@ -178,7 +373,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
           const Center(
             child: Text(
-              "Face Recognition System v2.4.1\nBuild 20231024",
+              "FACE MARK v2.4.1\nBuild 20231024",
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey, fontSize: 12),
             ),

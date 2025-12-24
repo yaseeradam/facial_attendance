@@ -6,10 +6,9 @@ import 'storage_service.dart';
 
 class ApiService {
   // For Android emulator use 10.0.2.2, for iOS simulator use localhost
-  // For physical device, use your computer's local IP (e.g., 192.168.x.x)
-  static const String baseUrl = 'http://10.0.2.2:8000'; // Android emulator
-  // static const String baseUrl = 'http://localhost:8000'; // iOS simulator / Web
-  // static const String baseUrl = 'http://192.168.1.x:8000'; // Physical device
+  // For physical device via USB: use localhost with adb reverse
+  // For physical device via WiFi: use computer's local IP
+  static const String baseUrl = 'http://192.168.43.70:8000'; // Network connection
   static String? _token;
 
   static Future<bool> _hasConnection() async {
@@ -134,6 +133,76 @@ class ApiService {
     _token = null;
   }
 
+  // Profile & Settings endpoints
+  static Future<Map<String, dynamic>> getProfile() async {
+    return await _makeRequest('GET', '/teachers/me');
+  }
+
+  static Future<Map<String, dynamic>> setupFaceId(File imageFile) async {
+    return await _makeRequest(
+      'POST',
+      '/teachers/setup-face-id',
+      file: imageFile,
+    );
+  }
+
+  static Future<Map<String, dynamic>> changePassword(String oldPassword, String newPassword) async {
+    return await _makeRequest('POST', '/teachers/change-password', body: {
+      'old_password': oldPassword,
+      'new_password': newPassword,
+    });
+  }
+
+  // Admin User Management endpoints
+  static Future<Map<String, dynamic>> getUsers() async {
+    return await _makeRequest('GET', '/teachers/');
+  }
+
+  static Future<Map<String, dynamic>> getUserById(String userId) async {
+    return await _makeRequest('GET', '/teachers/$userId');
+  }
+
+  static Future<Map<String, dynamic>> createUser(Map<String, dynamic> userData) async {
+    return await _makeRequest('POST', '/teachers/', body: userData);
+  }
+
+  static Future<Map<String, dynamic>> updateUser(String userId, Map<String, dynamic> userData) async {
+    return await _makeRequest('PUT', '/teachers/$userId', body: userData);
+  }
+
+  static Future<Map<String, dynamic>> deleteUser(String userId) async {
+    return await _makeRequest('DELETE', '/teachers/$userId');
+  }
+
+  static Future<Map<String, dynamic>> updateUserStatus(String userId, String status) async {
+    return await _makeRequest('PUT', '/teachers/$userId', body: {'status': status});
+  }
+
+  static Future<Map<String, dynamic>> bulkDeleteUsers(List<int> userIds) async {
+    return await _makeRequest('POST', '/teachers/bulk-delete', body: {'teacher_ids': userIds});
+  }
+
+  static Future<Map<String, dynamic>> exportUsersToCSV() async {
+    try {
+      if (!await _hasConnection()) {
+        return {'success': false, 'error': 'No internet connection'};
+      }
+
+      final uri = Uri.parse('$baseUrl/teachers/export/csv');
+      final headers = await _getHeaders();
+      
+      final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return {'success': true, 'data': response.body};
+      } else {
+        return {'success': false, 'error': 'Failed to export CSV'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Connection error: ${e.toString()}'};
+    }
+  }
+
   // Teacher endpoints
   static Future<Map<String, dynamic>> getTeachers() async {
     return await _makeRequest('GET', '/teachers/');
@@ -199,6 +268,24 @@ class ApiService {
     return await _makeRequest('DELETE', '/students/$studentId');
   }
 
+  static Future<Map<String, dynamic>> registerStudent({
+    required String studentId,
+    required String name,
+    required int classId,
+    required File imageFile,
+  }) async {
+    return await _makeRequest(
+      'POST',
+      '/students/register',
+      file: imageFile,
+      fields: {
+        'student_id': studentId,
+        'name': name,
+        'class_id': classId.toString(),
+      },
+    );
+  }
+
   // Face recognition endpoints
   static Future<Map<String, dynamic>> registerFace(int studentId, File imageFile) async {
     return await _makeRequest('POST', '/face/register', file: imageFile, fields: {'student_id': studentId.toString()});
@@ -235,14 +322,18 @@ class ApiService {
     return await _makeRequest('GET', endpoint);
   }
 
-  static Future<Map<String, dynamic>> getAttendanceHistory({int? classId, String? startDate, String? endDate}) async {
+  static Future<Map<String, dynamic>> getAttendanceHistory(DateTime? date) async {
     String endpoint = '/attendance/history';
-    List<String> params = [];
-    if (classId != null) params.add('class_id=$classId');
-    if (startDate != null) params.add('start_date=$startDate');
-    if (endDate != null) params.add('end_date=$endDate');
-    if (params.isNotEmpty) endpoint += '?${params.join('&')}';
+    if (date != null) {
+      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      endpoint += '?date=$dateStr';
+    }
     return await _makeRequest('GET', endpoint);
+  }
+
+  static Future<Map<String, dynamic>> exportAttendanceCSV(DateTime date) async {
+    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    return await _makeRequest('GET', '/attendance/export/csv?date=$dateStr');
   }
 
   // Dashboard & Statistics endpoints
@@ -252,22 +343,6 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getRecentActivity({int limit = 10}) async {
     return await _makeRequest('GET', '/dashboard/activity?limit=$limit');
-  }
-
-  // Profile endpoints
-  static Future<Map<String, dynamic>> getProfile() async {
-    return await _makeRequest('GET', '/auth/profile');
-  }
-
-  static Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> profileData) async {
-    return await _makeRequest('PUT', '/auth/profile', body: profileData);
-  }
-
-  static Future<Map<String, dynamic>> changePassword(String currentPassword, String newPassword) async {
-    return await _makeRequest('POST', '/auth/change-password', body: {
-      'current_password': currentPassword,
-      'new_password': newPassword,
-    });
   }
 
   // Reports endpoints

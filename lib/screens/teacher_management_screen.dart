@@ -1,11 +1,99 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/api_service.dart';
 
-class TeacherManagementScreen extends ConsumerWidget {
+class TeacherManagementScreen extends ConsumerStatefulWidget {
   const TeacherManagementScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TeacherManagementScreen> createState() => _TeacherManagementScreenState();
+}
+
+class _TeacherManagementScreenState extends ConsumerState<TeacherManagementScreen> {
+  List<Map<String, dynamic>> _teachers = [];
+  bool _isLoading = true;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTeachers();
+  }
+
+  Future<void> _loadTeachers() async {
+    setState(() => _isLoading = true);
+    final result = await ApiService.getTeachers();
+    if (result['success']) {
+      setState(() {
+        _teachers = List<Map<String, dynamic>>.from(result['data'] ?? []);
+        _isLoading = false;
+      });
+    } else {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'] ?? 'Failed to load teachers'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredTeachers {
+    if (_searchQuery.isEmpty) return _teachers;
+    return _teachers.where((teacher) {
+      final name = teacher['full_name']?.toString().toLowerCase() ?? '';
+      final email = teacher['email']?.toString().toLowerCase() ?? '';
+      return name.contains(_searchQuery.toLowerCase()) || email.contains(_searchQuery.toLowerCase());
+    }).toList();
+  }
+
+  Future<void> _deleteTeacher(int teacherId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Teacher'),
+        content: const Text('Are you sure you want to delete this teacher?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final result = await ApiService.deleteUser(teacherId.toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['success'] ? 'Teacher deleted' : result['error'] ?? 'Failed to delete'),
+            backgroundColor: result['success'] ? Colors.green : Colors.red,
+          ),
+        );
+        if (result['success']) _loadTeachers();
+      }
+    }
+  }
+
+  Future<void> _toggleStatus(int teacherId, String currentStatus) async {
+    final newStatus = currentStatus == 'active' ? 'inactive' : 'active';
+    final result = await ApiService.updateUserStatus(teacherId.toString(), newStatus);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['success'] ? 'Status updated' : result['error'] ?? 'Failed to update'),
+          backgroundColor: result['success'] ? Colors.green : Colors.red,
+        ),
+      );
+      if (result['success']) _loadTeachers();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -15,18 +103,23 @@ class TeacherManagementScreen extends ConsumerWidget {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_new),
           style: IconButton.styleFrom(
-            backgroundColor: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+            backgroundColor: isDark ? Colors.white10 : Colors.black.withOpacity(0.05),
           ),
         ),
-        title: const Text("Teacher Management"),
-        centerTitle: true,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Teacher Management"),
+            Text("${_teachers.length} teachers", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal)),
+          ],
+        ),
         actions: [
           IconButton.filledTonal(
-            onPressed: () {},
-            icon: const Icon(Icons.filter_list),
-            style: IconButton.styleFrom(
-              backgroundColor: theme.cardColor,
-            ),
+            onPressed: _loadTeachers,
+            icon: _isLoading 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.refresh),
+            style: IconButton.styleFrom(backgroundColor: theme.cardColor),
           ),
           const SizedBox(width: 16),
         ],
@@ -37,82 +130,49 @@ class TeacherManagementScreen extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
+              onChanged: (value) => setState(() => _searchQuery = value),
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.search),
                 hintText: "Search teachers...",
                 filled: true,
                 fillColor: theme.cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
             ),
           ),
           
-          // Filter Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _buildChip(context, "All Teachers", true),
-                const SizedBox(width: 8),
-                _buildChip(context, "Active", false),
-                const SizedBox(width: 8),
-                _buildChip(context, "Computer Science", false),
-                const SizedBox(width: 8),
-                _buildChip(context, "Engineering", false),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
           // Teacher List
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _buildTeacherCard(
-                  context,
-                  "Dr. Sarah Johnson",
-                  "sarah.johnson@school.com",
-                  "Computer Science",
-                  3,
-                  "https://lh3.googleusercontent.com/aida-public/AB6AXuDregapwWFizo_NQyT5_HtbKQQTXG-XamiNH3qpqa_nSNtQJSrqNdlwCMzYn3di0WzXXWDz12QHMZ0F2_ZjNLiZ9VE359ORmS_DfXrfJSSTg2nb9gotkDgSrjUkQu5JuzHnkBf_leBuNKpXR_z8OoVvfMnYlN77G9gxRblYmpzXcxCZEffg_rUl2dvOJTxk3NWHyK627ZLT6q8skFwRg1bBIxsZoaufMiuWpuTIZLfYgcorRNabxJZc4gSe6m78HZKcJqQgnQuurvo",
-                  true,
-                ),
-                _buildTeacherCard(
-                  context,
-                  "Prof. Michael Chen",
-                  "michael.chen@school.com",
-                  "Data Science",
-                  2,
-                  "https://lh3.googleusercontent.com/aida-public/AB6AXuAtugTlKnbb4thb3Rc1U2e7bvoTrYLfKdwK9CHmzKT6Gulm3CBwIT6zclUOKTiN1G3Roexcx_vcmdjoY9gCc8YhUz7naz5Y73X2R1zzFqI0phYovfH7l8z2LcRJuxUuWDEbiW6AJXkavzU44G-R7UKN_BImfLQO4Pz2gCb-w9kBDvsw5zBlqmVYf5W2BOXKVsrP2XgoQtbQZXatkp-g6egAMUoWo9qMcV9JAu2Jkh3_yfA7HiQ3Iuo9pcIlwrhk_EbXHrmFacWnHXI",
-                  true,
-                ),
-                _buildTeacherCard(
-                  context,
-                  "Dr. Emily Davis",
-                  "emily.davis@school.com",
-                  "Web Development",
-                  1,
-                  "https://lh3.googleusercontent.com/aida-public/AB6AXuA_DIAklXCa4g-T6AQ80h6DX2xIcIVhnjE0IzBVgXw6qNCSwFkz9jc7SGO_d8qcMYI4MtTLxbfFFif0QAVabk_12wHz_n_Bl38IEcvYeERn1tHJsvwLzHPgC29eFvpLj3gYpP_7s2WkCRgvzNm9SUtDzJtm8YCY6pYCFZstFArxSKYy6zl_Ipvdw-m-MxlE1N29JYSTZu9qFrQoH-YJR_-Os7eLNweek4jMbBlPZBMZ1PeGhMKLH1uycu-c2OyIjKIYvAC0RCfvYfI",
-                  false,
-                ),
-                _buildTeacherCard(
-                  context,
-                  "Prof. David Wilson",
-                  "david.wilson@school.com",
-                  "Machine Learning",
-                  2,
-                  null,
-                  true,
-                ),
-                const SizedBox(height: 100),
-              ],
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredTeachers.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.school_outlined, size: 64, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text('No teachers found', style: theme.textTheme.titleMedium),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () => _showCreateTeacherDialog(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add First Teacher'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadTeachers,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _filteredTeachers.length + 1,
+                          itemBuilder: (context, index) {
+                            if (index == _filteredTeachers.length) return const SizedBox(height: 100);
+                            return _buildTeacherCard(context, _filteredTeachers[index]);
+                          },
+                        ),
+                      ),
           ),
         ],
       ),
@@ -124,32 +184,11 @@ class TeacherManagementScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildChip(BuildContext context, String label, bool isSelected) {
-    final theme = Theme.of(context);
-    return Chip(
-      label: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : theme.colorScheme.onSurface,
-        ),
-      ),
-      backgroundColor: isSelected ? theme.colorScheme.primary : theme.cardColor,
-      side: BorderSide.none,
-      shape: const StadiumBorder(),
-    );
-  }
-
-  Widget _buildTeacherCard(
-    BuildContext context,
-    String name,
-    String email,
-    String department,
-    int classCount,
-    String? imageUrl,
-    bool isActive,
-  ) {
+  Widget _buildTeacherCard(BuildContext context, Map<String, dynamic> teacher) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isActive = teacher['status'] == 'active';
+    final isAdmin = teacher['role'] == 'admin';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -163,19 +202,13 @@ class TeacherManagementScreen extends ConsumerWidget {
         children: [
           Stack(
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey[200],
-                  image: imageUrl != null
-                      ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)
-                      : null,
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                child: Text(
+                  (teacher['full_name'] ?? 'T')[0].toUpperCase(),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
                 ),
-                child: imageUrl == null
-                    ? const Center(child: Icon(Icons.person, color: Colors.grey))
-                    : null,
               ),
               Positioned(
                 bottom: 0,
@@ -198,50 +231,31 @@ class TeacherManagementScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    Expanded(
+                      child: Text(teacher['full_name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isActive ? Colors.green.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
+                        color: isAdmin ? Colors.purple.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        isActive ? "Active" : "Inactive",
-                        style: TextStyle(
-                          color: isActive ? Colors.green : Colors.grey,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        isAdmin ? 'ADMIN' : 'TEACHER',
+                        style: TextStyle(color: isAdmin ? Colors.purple : Colors.blue, fontSize: 10, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  email,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                ),
+                Text(teacher['email'] ?? '', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.school, size: 16, color: Colors.grey[600]),
+                    Icon(Icons.badge, size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 4),
-                    Text(
-                      department,
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                    ),
-                    const SizedBox(width: 16),
-                    Icon(Icons.class_, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      "$classCount classes",
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                    ),
+                    Text(teacher['teacher_id'] ?? '', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
                   ],
                 ),
               ],
@@ -250,10 +264,19 @@ class TeacherManagementScreen extends ConsumerWidget {
           PopupMenuButton(
             icon: const Icon(Icons.more_vert),
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'edit', child: Text('Edit Teacher')),
-              const PopupMenuItem(value: 'classes', child: Text('View Classes')),
-              const PopupMenuItem(value: 'deactivate', child: Text('Deactivate')),
+              PopupMenuItem(
+                value: 'toggle',
+                child: Text(isActive ? 'Deactivate' : 'Activate'),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text('Delete', style: TextStyle(color: Colors.red)),
+              ),
             ],
+            onSelected: (value) {
+              if (value == 'toggle') _toggleStatus(teacher['id'], teacher['status'] ?? 'active');
+              if (value == 'delete') _deleteTeacher(teacher['id']);
+            },
           ),
         ],
       ),
@@ -263,78 +286,112 @@ class TeacherManagementScreen extends ConsumerWidget {
   void _showCreateTeacherDialog(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final idController = TextEditingController();
+    final passwordController = TextEditingController();
+    String role = 'teacher';
     
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Add New Teacher"),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                decoration: InputDecoration(
-                  labelText: "Full Name",
-                  hintText: "e.g., Dr. John Smith",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF1A2633) : Colors.white,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Add New Teacher"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: idController,
+                  decoration: InputDecoration(
+                    labelText: "Teacher ID",
+                    hintText: "e.g., T001",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1A2633) : Colors.white,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: "Email",
-                  hintText: "john.smith@school.com",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF1A2633) : Colors.white,
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: "Full Name",
+                    hintText: "e.g., Dr. John Smith",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1A2633) : Colors.white,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: "Teacher ID",
-                  hintText: "T001",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF1A2633) : Colors.white,
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emailController,
+                  decoration: InputDecoration(
+                    labelText: "Email",
+                    hintText: "john.smith@school.com",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1A2633) : Colors.white,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                decoration: InputDecoration(
-                  labelText: "Department",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF1A2633) : Colors.white,
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: "Password",
+                    hintText: "••••••••",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1A2633) : Colors.white,
+                  ),
                 ),
-                items: const [
-                  DropdownMenuItem(value: "cs", child: Text("Computer Science")),
-                  DropdownMenuItem(value: "eng", child: Text("Engineering")),
-                  DropdownMenuItem(value: "math", child: Text("Mathematics")),
-                  DropdownMenuItem(value: "physics", child: Text("Physics")),
-                ],
-                onChanged: (value) {},
-              ),
-            ],
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: role,
+                  decoration: InputDecoration(
+                    labelText: "Role",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1A2633) : Colors.white,
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: "teacher", child: Text("Teacher")),
+                    DropdownMenuItem(value: "admin", child: Text("Admin")),
+                  ],
+                  onChanged: (value) => setDialogState(() => role = value!),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            FilledButton(
+              onPressed: () async {
+                if (nameController.text.isNotEmpty && emailController.text.isNotEmpty && passwordController.text.isNotEmpty) {
+                  Navigator.pop(context);
+                  final result = await ApiService.createUser({
+                    'teacher_id': idController.text,
+                    'full_name': nameController.text,
+                    'email': emailController.text,
+                    'password': passwordController.text,
+                    'role': role,
+                    'status': 'active',
+                  });
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(result['success'] ? 'Teacher added!' : result['error'] ?? 'Failed to add teacher'),
+                        backgroundColor: result['success'] ? Colors.green : Colors.red,
+                      ),
+                    );
+                    if (result['success']) _loadTeachers();
+                  }
+                }
+              },
+              child: const Text("Add Teacher"),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Teacher added successfully!")),
-              );
-            },
-            child: const Text("Add Teacher"),
-          ),
-        ],
       ),
     );
   }

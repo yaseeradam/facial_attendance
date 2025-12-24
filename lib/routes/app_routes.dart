@@ -13,6 +13,7 @@ import '../screens/student_details_screen.dart';
 import '../screens/class_management_screen.dart';
 import '../screens/teacher_management_screen.dart';
 import '../screens/attendance_report_screen.dart';
+import '../screens/admin/admin_user_management_screen.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -29,6 +30,7 @@ class AppRoutes {
   static const String classManagement = '/class-management';
   static const String teacherManagement = '/teacher-management';
   static const String attendanceReport = '/attendance-report';
+  static const String adminUserManagement = '/admin-user-management';
 
   static Map<String, WidgetBuilder> get routes => {
     splash: (context) => const SplashScreen(),
@@ -45,5 +47,6 @@ class AppRoutes {
     classManagement: (context) => const ClassManagementScreen(),
     teacherManagement: (context) => const TeacherManagementScreen(),
     attendanceReport: (context) => const AttendanceReportScreen(),
+    adminUserManagement: (context) => const AdminUserManagementScreen(),
   };
 }

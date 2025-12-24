@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class StudentDetailsScreen extends ConsumerWidget {
-  const StudentDetailsScreen({super.key});
+  final Map<String, dynamic> student;
+  
+  const StudentDetailsScreen({super.key, this.student = const {}});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

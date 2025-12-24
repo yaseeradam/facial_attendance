@@ -1,11 +1,98 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/api_service.dart';
 
-class ClassManagementScreen extends ConsumerWidget {
+class ClassManagementScreen extends ConsumerStatefulWidget {
   const ClassManagementScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ClassManagementScreen> createState() => _ClassManagementScreenState();
+}
+
+class _ClassManagementScreenState extends ConsumerState<ClassManagementScreen> {
+  List<Map<String, dynamic>> _classes = [];
+  bool _isLoading = true;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClasses();
+  }
+
+  Future<void> _loadClasses() async {
+    setState(() => _isLoading = true);
+    final result = await ApiService.getClasses();
+    if (result['success']) {
+      setState(() {
+        _classes = List<Map<String, dynamic>>.from(result['data'] ?? []);
+        _isLoading = false;
+      });
+    } else {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'] ?? 'Failed to load classes'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredClasses {
+    if (_searchQuery.isEmpty) return _classes;
+    return _classes.where((cls) {
+      final name = cls['name']?.toString().toLowerCase() ?? '';
+      final code = cls['code']?.toString().toLowerCase() ?? '';
+      return name.contains(_searchQuery.toLowerCase()) || code.contains(_searchQuery.toLowerCase());
+    }).toList();
+  }
+
+  Future<void> _createClass(String name, String code) async {
+    final result = await ApiService.createClass({'class_name': name, 'class_code': code});
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['success'] ? 'Class created successfully!' : result['error'] ?? 'Failed to create class'),
+          backgroundColor: result['success'] ? Colors.green : Colors.red,
+        ),
+      );
+      if (result['success']) _loadClasses();
+    }
+  }
+
+  Future<void> _deleteClass(int classId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Class'),
+        content: const Text('Are you sure you want to delete this class?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final result = await ApiService.deleteClass(classId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['success'] ? 'Class deleted' : result['error'] ?? 'Failed to delete'),
+            backgroundColor: result['success'] ? Colors.green : Colors.red,
+          ),
+        );
+        if (result['success']) _loadClasses();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -15,18 +102,23 @@ class ClassManagementScreen extends ConsumerWidget {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_new),
           style: IconButton.styleFrom(
-            backgroundColor: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+            backgroundColor: isDark ? Colors.white10 : Colors.black.withOpacity(0.05),
           ),
         ),
-        title: const Text("Class Management"),
-        centerTitle: true,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Class Management"),
+            Text("${_classes.length} classes", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal)),
+          ],
+        ),
         actions: [
           IconButton.filledTonal(
-            onPressed: () {},
-            icon: const Icon(Icons.filter_list),
-            style: IconButton.styleFrom(
-              backgroundColor: theme.cardColor,
-            ),
+            onPressed: _loadClasses,
+            icon: _isLoading 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.refresh),
+            style: IconButton.styleFrom(backgroundColor: theme.cardColor),
           ),
           const SizedBox(width: 16),
         ],
@@ -37,82 +129,50 @@ class ClassManagementScreen extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
+              onChanged: (value) => setState(() => _searchQuery = value),
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.search),
                 hintText: "Search classes...",
                 filled: true,
                 fillColor: theme.cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
             ),
           ),
           
-          // Filter Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _buildChip(context, "All Classes", true),
-                const SizedBox(width: 8),
-                _buildChip(context, "Active", false),
-                const SizedBox(width: 8),
-                _buildChip(context, "Computer Science", false),
-                const SizedBox(width: 8),
-                _buildChip(context, "Engineering", false),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
           // Class List
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _buildClassCard(
-                  context,
-                  "Computer Science 101",
-                  "CS101",
-                  "Dr. Sarah Johnson",
-                  45,
-                  38,
-                  Colors.blue,
-                ),
-                _buildClassCard(
-                  context,
-                  "Data Structures",
-                  "CS201",
-                  "Prof. Michael Chen",
-                  32,
-                  29,
-                  Colors.green,
-                ),
-                _buildClassCard(
-                  context,
-                  "Web Development",
-                  "CS301",
-                  "Dr. Emily Davis",
-                  28,
-                  25,
-                  Colors.purple,
-                ),
-                _buildClassCard(
-                  context,
-                  "Machine Learning",
-                  "CS401",
-                  "Prof. David Wilson",
-                  35,
-                  31,
-                  Colors.orange,
-                ),
-                const SizedBox(height: 100),
-              ],
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredClasses.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.class_outlined, size: 64, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text('No classes found', style: theme.textTheme.titleMedium),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () => _showCreateClassDialog(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Create First Class'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadClasses,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _filteredClasses.length + 1,
+                          itemBuilder: (context, index) {
+                            if (index == _filteredClasses.length) return const SizedBox(height: 100);
+                            final cls = _filteredClasses[index];
+                            return _buildClassCard(context, cls);
+                          },
+                        ),
+                      ),
           ),
         ],
       ),
@@ -124,33 +184,12 @@ class ClassManagementScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildChip(BuildContext context, String label, bool isSelected) {
-    final theme = Theme.of(context);
-    return Chip(
-      label: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : theme.colorScheme.onSurface,
-        ),
-      ),
-      backgroundColor: isSelected ? theme.colorScheme.primary : theme.cardColor,
-      side: BorderSide.none,
-      shape: const StadiumBorder(),
-    );
-  }
-
-  Widget _buildClassCard(
-    BuildContext context,
-    String className,
-    String classCode,
-    String teacher,
-    int totalStudents,
-    int presentToday,
-    Color color,
-  ) {
+  Widget _buildClassCard(BuildContext context, Map<String, dynamic> cls) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final attendanceRate = (presentToday / totalStudents * 100).round();
+    final colors = [Colors.blue, Colors.green, Colors.purple, Colors.orange, Colors.teal];
+    final color = colors[cls['id'] % colors.length];
+    final studentCount = cls['student_count'] ?? 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -169,7 +208,7 @@ class ClassManagementScreen extends ConsumerWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
+                  color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(Icons.class_, color: color, size: 24),
@@ -179,14 +218,8 @@ class ClassManagementScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      className,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    Text(
-                      "$classCode • $teacher",
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                    ),
+                    Text(cls['name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(cls['code'] ?? '', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
                   ],
                 ),
               ),
@@ -195,23 +228,19 @@ class ClassManagementScreen extends ConsumerWidget {
                 itemBuilder: (context) => [
                   const PopupMenuItem(value: 'edit', child: Text('Edit Class')),
                   const PopupMenuItem(value: 'students', child: Text('View Students')),
-                  const PopupMenuItem(value: 'attendance', child: Text('Attendance Report')),
+                  const PopupMenuItem(value: 'delete', child: Text('Delete Class', style: TextStyle(color: Colors.red))),
                 ],
+                onSelected: (value) {
+                  if (value == 'delete') _deleteClass(cls['id']);
+                },
               ),
             ],
           ),
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(
-                child: _buildStatItem("Total Students", totalStudents.toString(), Icons.people),
-              ),
-              Expanded(
-                child: _buildStatItem("Present Today", presentToday.toString(), Icons.check_circle),
-              ),
-              Expanded(
-                child: _buildStatItem("Attendance", "$attendanceRate%", Icons.trending_up),
-              ),
+              Expanded(child: _buildStatItem("Students", studentCount.toString(), Icons.people)),
+              Expanded(child: _buildStatItem("Code", cls['code'] ?? '-', Icons.tag)),
             ],
           ),
         ],
@@ -224,15 +253,8 @@ class ClassManagementScreen extends ConsumerWidget {
       children: [
         Icon(icon, size: 20, color: Colors.grey[600]),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        Text(
-          label,
-          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-          textAlign: TextAlign.center,
-        ),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 12), textAlign: TextAlign.center),
       ],
     );
   }
@@ -240,6 +262,8 @@ class ClassManagementScreen extends ConsumerWidget {
   void _showCreateClassDialog(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final nameController = TextEditingController();
+    final codeController = TextEditingController();
     
     showDialog(
       context: context,
@@ -249,6 +273,7 @@ class ClassManagementScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
+              controller: nameController,
               decoration: InputDecoration(
                 labelText: "Class Name",
                 hintText: "e.g., Computer Science 101",
@@ -259,6 +284,7 @@ class ClassManagementScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             TextField(
+              controller: codeController,
               decoration: InputDecoration(
                 labelText: "Class Code",
                 hintText: "e.g., CS101",
@@ -267,34 +293,16 @@ class ClassManagementScreen extends ConsumerWidget {
                 fillColor: isDark ? const Color(0xFF1A2633) : Colors.white,
               ),
             ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                labelText: "Assigned Teacher",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: isDark ? const Color(0xFF1A2633) : Colors.white,
-              ),
-              items: const [
-                DropdownMenuItem(value: "teacher1", child: Text("Dr. Sarah Johnson")),
-                DropdownMenuItem(value: "teacher2", child: Text("Prof. Michael Chen")),
-                DropdownMenuItem(value: "teacher3", child: Text("Dr. Emily Davis")),
-              ],
-              onChanged: (value) {},
-            ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           FilledButton(
             onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Class created successfully!")),
-              );
+              if (nameController.text.isNotEmpty && codeController.text.isNotEmpty) {
+                Navigator.pop(context);
+                _createClass(nameController.text, codeController.text);
+              }
             },
             child: const Text("Create"),
           ),

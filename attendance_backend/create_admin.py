@@ -1,37 +1,34 @@
-#!/usr/bin/env python3
-"""Create admin user"""
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import sqlite3
+from passlib.hash import bcrypt
 
-from app.db.base import SessionLocal
-from app.services.teacher_service import TeacherService
-from app.schemas.teacher import TeacherCreate
-import asyncio
+# Connect to database
+conn = sqlite3.connect('attendance.db')
+cursor = conn.cursor()
 
-async def create_admin():
-    db = SessionLocal()
-    try:
-        teacher_service = TeacherService()
-        admin_data = TeacherCreate(
-            teacher_id="admin001",
-            full_name="System Administrator", 
-            email="admin@school.com",
-            password="admin",
-            role="admin"
-        )
-        
-        result = await teacher_service.create_teacher(admin_data, db)
-        if result:
-            print("✅ Admin user created successfully!")
-            print(f"Email: {admin_data['email']}")
-            print(f"Password: {admin_data['password']}")
-        else:
-            print("❌ Failed to create admin user")
-    except Exception as e:
-        print(f"Error: {e}")
-    finally:
-        db.close()
+# Check if admin already exists
+cursor.execute("SELECT * FROM teachers WHERE email = 'admin@school.com'")
+existing_admin = cursor.fetchone()
 
-if __name__ == "__main__":
-    asyncio.run(create_admin())
+if existing_admin:
+    print('Admin user already exists!')
+    print('Email: admin@school.com')
+    print('Password: admin123')
+    print('\nYou can login with these credentials.')
+else:
+    # Create admin user
+    password_hash = bcrypt.hash('admin123')
+    
+    cursor.execute("""
+        INSERT INTO teachers (teacher_id, full_name, email, password_hash, role, status)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, ('admin001', 'System Administrator', 'admin@school.com', password_hash, 'admin', 'active'))
+    
+    conn.commit()
+    print('SUCCESS! Admin user created!')
+    print('\n=== LOGIN CREDENTIALS ===')
+    print('Email: admin@school.com')
+    print('Password: admin123')
+    print('=========================')
+    print('\nYou can now login to the app and access User Management.')
+
+conn.close()

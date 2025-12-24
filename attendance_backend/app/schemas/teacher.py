@@ -9,6 +9,15 @@ class TeacherCreate(BaseModel):
     email: EmailStr
     password: str
     role: Optional[str] = "teacher"
+    status: Optional[str] = "active"
+
+class TeacherUpdate(BaseModel):
+    user_id: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    status: Optional[str] = None
 
 class TeacherResponse(BaseModel):
     id: int
@@ -16,6 +25,7 @@ class TeacherResponse(BaseModel):
     full_name: str
     email: str
     role: str
+    status: Optional[str] = "active"
     created_at: datetime
     
     class Config:

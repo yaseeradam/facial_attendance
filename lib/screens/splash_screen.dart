@@ -129,26 +129,39 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     return Transform.translate(
                       offset: Offset(0, -_animation.value),
                       child: Container(
-                        width: 128,
-                        height: 128,
+                        width: 160,
+                        height: 160,
                         decoration: BoxDecoration(
                           color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(32),
                           boxShadow: [
                             BoxShadow(
-                              color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                              blurRadius: 20,
+                              color: theme.colorScheme.primary.withOpacity(0.2),
+                              blurRadius: 30,
                               offset: const Offset(0, 10),
                             ),
                           ],
                           border: Border.all(
                             color: isDark ? Colors.blueGrey[800]! : Colors.grey[100]!,
+                            width: 2,
                           ),
                         ),
-                        child: Icon(
-                          Icons.face,
-                          size: 64,
-                          color: theme.colorScheme.primary,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(30),
+                          child: Image.asset(
+                            'lib/public/android-chrome-192x192.png',
+                            width: 160,
+                            height: 160,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              // Fallback to icon if image fails to load
+                              return Icon(
+                                Icons.face,
+                                size: 80,
+                                color: theme.colorScheme.primary,
+                              );
+                            },
+                          ),
                         ),
                       ),
                     );
@@ -157,17 +170,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 const SizedBox(height: 32),
                 // Text Content
                 Text(
-                  "Smart Attendance",
+                  "FACE MARK",
                   style: theme.textTheme.displayLarge?.copyWith(
-                    fontSize: 32,
-                    letterSpacing: -0.5,
+                    fontSize: 38,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "Face Recognition Attendance System",
+                  "Smart Face Recognition Attendance",
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontSize: 18,
+                    fontSize: 16,
                   ),
                 ),
                 const SizedBox(height: 48),

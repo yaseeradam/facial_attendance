@@ -18,6 +18,10 @@ async def create_class(
 ):
     """Create a new class (Admin only)"""
     try:
+        # If teacher_id not provided, assign to current admin
+        if not class_data.teacher_id:
+            class_data.teacher_id = current_user["user_id"]
+            
         class_obj = await class_service.create_class(class_data, db)
         return ClassResponse.model_validate(class_obj)
     except ValueError as e:

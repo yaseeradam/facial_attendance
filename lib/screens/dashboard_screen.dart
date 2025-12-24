@@ -9,6 +9,7 @@ import 'attendance_history_screen.dart';
 import 'student_list_screen.dart';
 import 'class_management_screen.dart';
 import 'teacher_management_screen.dart';
+import '../services/api_service.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -19,6 +20,65 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int _currentIndex = 0;
+  bool _isLoading = true;
+  
+  // Real data from API
+  int _totalStudents = 0;
+  int _totalClasses = 0;
+  int _presentToday = 0;
+  int _totalTeachers = 0;
+  double _attendanceRate = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      // Fetch students
+      final studentsResult = await ApiService.getStudents();
+      if (studentsResult['success']) {
+        final students = studentsResult['data'] as List? ?? [];
+        _totalStudents = students.length;
+      }
+      
+      // Fetch classes
+      final classesResult = await ApiService.getClasses();
+      if (classesResult['success']) {
+        final classes = classesResult['data'] as List? ?? [];
+        _totalClasses = classes.length;
+      }
+      
+      // Fetch teachers
+      final teachersResult = await ApiService.getTeachers();
+      if (teachersResult['success']) {
+        final teachers = teachersResult['data'] as List? ?? [];
+        _totalTeachers = teachers.length;
+      }
+      
+      // Fetch today's attendance
+      final attendanceResult = await ApiService.getTodayAttendance();
+      if (attendanceResult['success']) {
+        final attendance = attendanceResult['data'] as List? ?? [];
+        _presentToday = attendance.length;
+        
+        // Calculate attendance rate
+        if (_totalStudents > 0) {
+          _attendanceRate = (_presentToday / _totalStudents) * 100;
+        }
+      }
+    } catch (e) {
+      // Handle errors silently, show 0 values
+    }
+    
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   void _onNavTap(int index) {
     setState(() {
@@ -67,12 +127,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         height: 48,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2), width: 2),
-                          image: const DecorationImage(
-                            image: NetworkImage("https://lh3.googleusercontent.com/aida-public/AB6AXuBV0Vj6XKh3-jYfldvqMR3w4vv3pvno_ax7Ta2DmB9HIc-ROclXgKBPvClCvz-OcotLuJySA9ZUi1F-1OrXPy2em8XfIK-rGm-Ccjytx5Bbf8r_5ue5TzWBLHplUlD8sflxHFq3fZj8llRPy-bEw99tiwrR7DyQ7jcGtZ7-mqyD_z6-kIQuZ07PPgL1p1_FIDzkVsv9ulnRhLEWD4pcloQrhXrQEraWXjSeXlUuXlTmU81Xi_scbMwVzmPndf3tcOJB8QxsCV7sZpY"),
-                            fit: BoxFit.cover,
-                          ),
+                          border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2), width: 2),
+                          color: theme.colorScheme.primary.withOpacity(0.1),
                         ),
+                        child: Icon(Icons.person, color: theme.colorScheme.primary),
                       ),
                       Positioned(
                         bottom: 0,
@@ -95,13 +153,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Welcome back,", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500)),
-                        Text("Admin User 👋", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                        Text("Admin", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
                   IconButton.filledTonal(
-                    onPressed: () {},
-                    icon: const Icon(Icons.notifications_outlined),
+                    onPressed: _loadDashboardData,
+                    icon: _isLoading 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.refresh),
                     style: IconButton.styleFrom(
                       backgroundColor: isDark ? Colors.grey[800] : Colors.grey[100],
                       foregroundColor: isDark ? Colors.grey[300] : Colors.grey[600],
@@ -112,102 +172,119 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
             // Scrollable Content
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: 100),
-                children: [
-                  // Stats Section
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Text("Overview", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(height: 16),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
+              child: RefreshIndicator(
+                onRefresh: _loadDashboardData,
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  children: [
+                    // Stats Section
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text("Overview", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 16),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Row(
+                        children: [
+                          _buildStatCard(
+                            context,
+                            icon: Icons.face,
+                            iconBg: Colors.white,
+                            iconColor: theme.colorScheme.primary,
+                            label: "Present Today",
+                            value: _isLoading ? "..." : "${_attendanceRate.toStringAsFixed(0)}%",
+                            trend: _presentToday > 0 ? "+$_presentToday" : null,
+                            bg: theme.colorScheme.primary,
+                            textColor: Colors.white,
+                          ),
+                          const SizedBox(width: 16),
+                          _buildStatCard(
+                            context,
+                            icon: Icons.groups,
+                            iconBg: Colors.blue[50] ?? Colors.blue.shade50,
+                            iconColor: theme.colorScheme.primary,
+                            label: "Total Students",
+                            value: _isLoading ? "..." : "$_totalStudents",
+                            bg: theme.cardColor,
+                            textColor: theme.colorScheme.onSurface,
+                            isOutlined: true,
+                          ),
+                          const SizedBox(width: 16),
+                           _buildStatCard(
+                            context,
+                            icon: Icons.class_,
+                            iconBg: Colors.purple[50] ?? Colors.purple.shade50,
+                            iconColor: Colors.purple,
+                            label: "Classes",
+                            value: _isLoading ? "..." : "$_totalClasses",
+                            bg: theme.cardColor,
+                            textColor: theme.colorScheme.onSurface,
+                            isOutlined: true,
+                          ),
+                          const SizedBox(width: 16),
+                           _buildStatCard(
+                            context,
+                            icon: Icons.school,
+                            iconBg: Colors.orange[50] ?? Colors.orange.shade50,
+                            iconColor: Colors.orange,
+                            label: "Teachers",
+                            value: _isLoading ? "..." : "$_totalTeachers",
+                            bg: theme.cardColor,
+                            textColor: theme.colorScheme.onSurface,
+                            isOutlined: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Quick Actions
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("Quick Actions", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 16,
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
                       children: [
-                        _buildStatCard(
-                          context,
-                          icon: Icons.face,
-                          iconBg: Colors.white,
-                          iconColor: theme.colorScheme.primary,
-                          label: "Present Today",
-                          value: "85%",
-                          trend: "+12%",
-                          bg: theme.colorScheme.primary,
-                          textColor: Colors.white,
-                        ),
-                        const SizedBox(width: 16),
-                        _buildStatCard(
-                          context,
-                          icon: Icons.groups,
-                          iconBg: Colors.blue[50] ?? Colors.blue.shade50,
-                          iconColor: theme.colorScheme.primary,
-                          label: "Total Students",
-                          value: "450",
-                          bg: theme.cardColor,
-                          textColor: theme.colorScheme.onSurface,
-                          isOutlined: true,
-                        ),
-                        const SizedBox(width: 16),
-                         _buildStatCard(
-                          context,
-                          icon: Icons.domain,
-                          iconBg: Colors.purple[50] ?? Colors.purple.shade50,
-                          iconColor: Colors.purple,
-                          label: "Departments",
-                          value: "12",
-                          bg: theme.cardColor,
-                          textColor: theme.colorScheme.onSurface,
-                          isOutlined: true,
-                        ),
+                        _buildActionCard(context, "Register New", Icons.person_add, Colors.blue, 
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterStudentScreen()))),
+                        _buildActionCard(context, "Scan Face", Icons.center_focus_strong, Colors.green,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarkAttendanceScreen1()))),
+                        _buildActionCard(context, "Classes", Icons.class_, Colors.purple,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ClassManagementScreen()))),
+                        _buildActionCard(context, "Teachers", Icons.school, Colors.orange,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherManagementScreen()))),
+                        _buildActionCard(context, "User Management", Icons.manage_accounts, Colors.indigo,
+                          () => Navigator.pushNamed(context, '/admin-user-management')),
+                        _buildActionCard(context, "Reports", Icons.bar_chart, Colors.teal,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()))),
+                        _buildActionCard(context, "System", Icons.settings, Colors.grey,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Quick Actions
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text("Quick Actions", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                        TextButton(onPressed: () {}, child: const Text("Edit")),
-                      ],
+                    const SizedBox(height: 24),
+                    // Quick Info
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text("Quick Info", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                     ),
-                  ),
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    children: [
-                      _buildActionCard(context, "Register New", Icons.person_add, Colors.blue, 
-                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterStudentScreen()))),
-                      _buildActionCard(context, "Scan Face", Icons.center_focus_strong, Colors.green,
-                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarkAttendanceScreen1()))),
-                      _buildActionCard(context, "Classes", Icons.class_, Colors.purple,
-                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ClassManagementScreen()))),
-                      _buildActionCard(context, "Teachers", Icons.school, Colors.orange,
-                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherManagementScreen()))),
-                      _buildActionCard(context, "Reports", Icons.bar_chart, Colors.teal,
-                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()))),
-                      _buildActionCard(context, "System", Icons.settings, Colors.grey,
-                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  // Recent Activity
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Text("Recent Activity", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildActivityItem(context, "Attendance Synced", "Just now", Icons.check_circle, Colors.green),
-                  _buildActivityItem(context, "New Student Registered", "2 hours ago", Icons.person_add, Colors.blue),
-                ],
+                    const SizedBox(height: 16),
+                    _buildInfoItem(context, "Total Students", "$_totalStudents registered", Icons.people, Colors.blue),
+                    _buildInfoItem(context, "Total Classes", "$_totalClasses active classes", Icons.class_, Colors.purple),
+                    _buildInfoItem(context, "Total Teachers", "$_totalTeachers teachers", Icons.school, Colors.orange),
+                  ],
+                ),
               ),
             ),
           ],
@@ -220,7 +297,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           border: Border(top: BorderSide(color: isDark ? Colors.grey[800]! : Colors.grey[200]!)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, -4),
             ),
@@ -253,7 +330,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         border: isOutlined ? Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[200]!) : null,
         boxShadow: !isOutlined ? [
           BoxShadow(
-            color: bg.withValues(alpha: 0.3),
+            color: bg.withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -268,7 +345,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isOutlined ? iconBg.withValues(alpha: isDark ? 0.1 : 1) : Colors.white.withValues(alpha: 0.2),
+                  color: isOutlined ? iconBg.withOpacity(isDark ? 0.1 : 1) : Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: isOutlined ? iconColor : Colors.white),
@@ -277,7 +354,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: Text(trend, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -285,7 +362,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Text(label, style: TextStyle(color: textColor.withValues(alpha: 0.8), fontSize: 14, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
           Text(value, style: TextStyle(color: textColor, fontSize: 24, fontWeight: FontWeight.bold)),
         ],
@@ -313,7 +390,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                color: color.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 32),
@@ -326,7 +403,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildActivityItem(BuildContext context, String title, String time, IconData icon, Color color) {
+  Widget _buildInfoItem(BuildContext context, String title, String subtitle, IconData icon, Color color) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -343,7 +420,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 20),
@@ -354,7 +431,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                Text(time, style: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[500], fontSize: 12)),
+                Text(subtitle, style: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[500], fontSize: 12)),
               ],
             ),
           ),
