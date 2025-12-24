@@ -5,7 +5,11 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'storage_service.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://your-server-ip:8000'; // Update with your actual server IP
+  // For Android emulator use 10.0.2.2, for iOS simulator use localhost
+  // For physical device, use your computer's local IP (e.g., 192.168.x.x)
+  static const String baseUrl = 'http://10.0.2.2:8000'; // Android emulator
+  // static const String baseUrl = 'http://localhost:8000'; // iOS simulator / Web
+  // static const String baseUrl = 'http://192.168.1.x:8000'; // Physical device
   static String? _token;
 
   static Future<bool> _hasConnection() async {
@@ -32,7 +36,7 @@ class ApiService {
 
       switch (method.toUpperCase()) {
         case 'GET':
-          response = await http.get(uri, headers: headers).timeout(Duration(seconds: 30));
+          response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 30));
           break;
         case 'POST':
           if (file != null) {
@@ -40,17 +44,17 @@ class ApiService {
             request.headers.addAll(headers);
             if (fields != null) request.fields.addAll(fields);
             request.files.add(await http.MultipartFile.fromPath('file', file.path));
-            final streamedResponse = await request.send().timeout(Duration(seconds: 60));
+            final streamedResponse = await request.send().timeout(const Duration(seconds: 60));
             response = await http.Response.fromStream(streamedResponse);
           } else {
-            response = await http.post(uri, headers: headers, body: jsonEncode(body)).timeout(Duration(seconds: 30));
+            response = await http.post(uri, headers: headers, body: jsonEncode(body)).timeout(const Duration(seconds: 30));
           }
           break;
         case 'PUT':
-          response = await http.put(uri, headers: headers, body: jsonEncode(body)).timeout(Duration(seconds: 30));
+          response = await http.put(uri, headers: headers, body: jsonEncode(body)).timeout(const Duration(seconds: 30));
           break;
         case 'DELETE':
-          response = await http.delete(uri, headers: headers).timeout(Duration(seconds: 30));
+          response = await http.delete(uri, headers: headers).timeout(const Duration(seconds: 30));
           break;
         default:
           return {'success': false, 'error': 'Invalid HTTP method'};
@@ -82,14 +86,14 @@ class ApiService {
 
   static Future<Map<String, dynamic>> _refreshToken() async {
     try {
-      final refreshToken = await StorageService.getString('refresh_token');
+      final refreshToken = StorageService.getString('refresh_token');
       if (refreshToken == null) return {'success': false};
 
       final response = await http.post(
         Uri.parse('$baseUrl/auth/refresh'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'refresh_token': refreshToken}),
-      ).timeout(Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -135,8 +139,20 @@ class ApiService {
     return await _makeRequest('GET', '/teachers/');
   }
 
+  static Future<Map<String, dynamic>> getTeacherById(int teacherId) async {
+    return await _makeRequest('GET', '/teachers/$teacherId');
+  }
+
   static Future<Map<String, dynamic>> createTeacher(Map<String, dynamic> teacherData) async {
     return await _makeRequest('POST', '/teachers/', body: teacherData);
+  }
+
+  static Future<Map<String, dynamic>> updateTeacher(int teacherId, Map<String, dynamic> teacherData) async {
+    return await _makeRequest('PUT', '/teachers/$teacherId', body: teacherData);
+  }
+
+  static Future<Map<String, dynamic>> deleteTeacher(int teacherId) async {
+    return await _makeRequest('DELETE', '/teachers/$teacherId');
   }
 
   // Class endpoints
@@ -144,8 +160,20 @@ class ApiService {
     return await _makeRequest('GET', '/classes/');
   }
 
+  static Future<Map<String, dynamic>> getClassById(int classId) async {
+    return await _makeRequest('GET', '/classes/$classId');
+  }
+
   static Future<Map<String, dynamic>> createClass(Map<String, dynamic> classData) async {
     return await _makeRequest('POST', '/classes/', body: classData);
+  }
+
+  static Future<Map<String, dynamic>> updateClass(int classId, Map<String, dynamic> classData) async {
+    return await _makeRequest('PUT', '/classes/$classId', body: classData);
+  }
+
+  static Future<Map<String, dynamic>> deleteClass(int classId) async {
+    return await _makeRequest('DELETE', '/classes/$classId');
   }
 
   // Student endpoints
@@ -155,8 +183,20 @@ class ApiService {
     return await _makeRequest('GET', endpoint);
   }
 
+  static Future<Map<String, dynamic>> getStudentById(int studentId) async {
+    return await _makeRequest('GET', '/students/$studentId');
+  }
+
   static Future<Map<String, dynamic>> createStudent(Map<String, dynamic> studentData) async {
     return await _makeRequest('POST', '/students/', body: studentData);
+  }
+
+  static Future<Map<String, dynamic>> updateStudent(int studentId, Map<String, dynamic> studentData) async {
+    return await _makeRequest('PUT', '/students/$studentId', body: studentData);
+  }
+
+  static Future<Map<String, dynamic>> deleteStudent(int studentId) async {
+    return await _makeRequest('DELETE', '/students/$studentId');
   }
 
   // Face recognition endpoints
@@ -166,6 +206,10 @@ class ApiService {
 
   static Future<Map<String, dynamic>> verifyFace(int classId, File imageFile) async {
     return await _makeRequest('POST', '/face/verify', file: imageFile, fields: {'class_id': classId.toString()});
+  }
+
+  static Future<Map<String, dynamic>> deleteFace(int studentId) async {
+    return await _makeRequest('DELETE', '/face/$studentId');
   }
 
   // Attendance endpoints
@@ -188,6 +232,66 @@ class ApiService {
   static Future<Map<String, dynamic>> getAttendanceSummary(int classId, {String? date}) async {
     String endpoint = '/attendance/summary/$classId';
     if (date != null) endpoint += '?date_filter=$date';
+    return await _makeRequest('GET', endpoint);
+  }
+
+  static Future<Map<String, dynamic>> getAttendanceHistory({int? classId, String? startDate, String? endDate}) async {
+    String endpoint = '/attendance/history';
+    List<String> params = [];
+    if (classId != null) params.add('class_id=$classId');
+    if (startDate != null) params.add('start_date=$startDate');
+    if (endDate != null) params.add('end_date=$endDate');
+    if (params.isNotEmpty) endpoint += '?${params.join('&')}';
+    return await _makeRequest('GET', endpoint);
+  }
+
+  // Dashboard & Statistics endpoints
+  static Future<Map<String, dynamic>> getDashboardStats() async {
+    return await _makeRequest('GET', '/dashboard/stats');
+  }
+
+  static Future<Map<String, dynamic>> getRecentActivity({int limit = 10}) async {
+    return await _makeRequest('GET', '/dashboard/activity?limit=$limit');
+  }
+
+  // Profile endpoints
+  static Future<Map<String, dynamic>> getProfile() async {
+    return await _makeRequest('GET', '/auth/profile');
+  }
+
+  static Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> profileData) async {
+    return await _makeRequest('PUT', '/auth/profile', body: profileData);
+  }
+
+  static Future<Map<String, dynamic>> changePassword(String currentPassword, String newPassword) async {
+    return await _makeRequest('POST', '/auth/change-password', body: {
+      'current_password': currentPassword,
+      'new_password': newPassword,
+    });
+  }
+
+  // Reports endpoints
+  static Future<Map<String, dynamic>> getAttendanceReport({
+    required int classId,
+    String? startDate,
+    String? endDate,
+    String? format, // 'json', 'csv', 'pdf'
+  }) async {
+    String endpoint = '/reports/attendance/$classId';
+    List<String> params = [];
+    if (startDate != null) params.add('start_date=$startDate');
+    if (endDate != null) params.add('end_date=$endDate');
+    if (format != null) params.add('format=$format');
+    if (params.isNotEmpty) endpoint += '?${params.join('&')}';
+    return await _makeRequest('GET', endpoint);
+  }
+
+  static Future<Map<String, dynamic>> getStudentReport(int studentId, {String? startDate, String? endDate}) async {
+    String endpoint = '/reports/student/$studentId';
+    List<String> params = [];
+    if (startDate != null) params.add('start_date=$startDate');
+    if (endDate != null) params.add('end_date=$endDate');
+    if (params.isNotEmpty) endpoint += '?${params.join('&')}';
     return await _makeRequest('GET', endpoint);
   }
 

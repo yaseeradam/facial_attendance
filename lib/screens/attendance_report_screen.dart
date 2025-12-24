@@ -23,7 +23,7 @@ class _AttendanceReportScreenState extends ConsumerState<AttendanceReportScreen>
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_new),
           style: IconButton.styleFrom(
-            backgroundColor: isDark ? Colors.white10 : Colors.black.withOpacity(0.05),
+            backgroundColor: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
           ),
         ),
         title: const Text("Attendance Reports"),
@@ -56,7 +56,7 @@ class _AttendanceReportScreenState extends ConsumerState<AttendanceReportScreen>
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: selectedPeriod,
+                        initialValue: selectedPeriod,
                         decoration: InputDecoration(
                           labelText: "Time Period",
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -79,7 +79,7 @@ class _AttendanceReportScreenState extends ConsumerState<AttendanceReportScreen>
                     const SizedBox(width: 16),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: selectedClass,
+                        initialValue: selectedClass,
                         decoration: InputDecoration(
                           labelText: "Class",
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -283,7 +283,7 @@ class _AttendanceReportScreenState extends ConsumerState<AttendanceReportScreen>
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 24),
@@ -320,9 +320,9 @@ class _AttendanceReportScreenState extends ConsumerState<AttendanceReportScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -330,7 +330,7 @@ class _AttendanceReportScreenState extends ConsumerState<AttendanceReportScreen>
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(Icons.class_, color: color, size: 24),

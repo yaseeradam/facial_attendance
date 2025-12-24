@@ -15,7 +15,7 @@ class TeacherManagementScreen extends ConsumerWidget {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_new),
           style: IconButton.styleFrom(
-            backgroundColor: isDark ? Colors.white10 : Colors.black.withOpacity(0.05),
+            backgroundColor: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
           ),
         ),
         title: const Text("Teacher Management"),
@@ -207,7 +207,7 @@ class TeacherManagementScreen extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isActive ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                        color: isActive ? Colors.green.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(

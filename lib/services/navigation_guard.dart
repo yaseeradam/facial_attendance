@@ -33,8 +33,6 @@ class AuthGuardWrapper extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authProvider);
-    
     if (!NavigationGuard.canAccess(ref, routeName)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);

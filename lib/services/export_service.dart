@@ -30,7 +30,7 @@ class ExportService {
         pw.Page(
           build: (pw.Context context) {
             return pw.Center(
-              child: pw.Text('No data available', style: pw.TextStyle(fontSize: 24)),
+              child: pw.Text('No data available', style: const pw.TextStyle(fontSize: 24)),
             );
           },
         ),
@@ -48,7 +48,7 @@ class ExportService {
                 child: pw.Text(title, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 20),
-              pw.Table.fromTextArray(
+              pw.TableHelper.fromTextArray(
                 headers: headers,
                 data: data.map((item) => headers.map((header) => item[header]?.toString() ?? '').toList()).toList(),
                 headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),

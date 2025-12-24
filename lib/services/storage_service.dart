@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class StorageService {
   static const _storage = FlutterSecureStorage();
@@ -11,7 +11,10 @@ class StorageService {
 
   static Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
-    await _initDatabase();
+    // Skip database initialization on web since sqflite doesn't support web
+    if (!kIsWeb) {
+      await _initDatabase();
+    }
   }
 
   static Future<void> _initDatabase() async {

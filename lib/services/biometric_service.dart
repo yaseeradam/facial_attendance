@@ -34,7 +34,7 @@ class BiometricService {
           stickyAuth: true,
         ),
       );
-    } on PlatformException catch (e) {
+    } on PlatformException {
       return false;
     }
   }

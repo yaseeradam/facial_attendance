@@ -129,7 +129,7 @@ class _MarkAttendanceScreen1State extends ConsumerState<MarkAttendanceScreen1> w
                                   child: Container(
                                     height: 2,
                                     decoration: BoxDecoration(
-                                      color: theme.colorScheme.primary.withOpacity(0.8),
+                                      color: theme.colorScheme.primary.withValues(alpha: 0.8),
                                       boxShadow: [
                                         BoxShadow(color: theme.colorScheme.primary, blurRadius: 10),
                                       ],
@@ -206,7 +206,7 @@ class _MarkAttendanceScreen1State extends ConsumerState<MarkAttendanceScreen1> w
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                                decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
                                 child: const Text("Present", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
                               ),
                               const SizedBox(height: 4),

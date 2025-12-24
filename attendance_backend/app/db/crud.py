@@ -81,6 +81,73 @@ def update_student_face_enrolled(db: Session, student_id: int, enrolled: bool) -
         db.refresh(student)
     return student
 
+def update_student(db: Session, student_id: int, update_data: dict) -> models.Student:
+    student = get_student_by_id(db, student_id)
+    if student:
+        for key, value in update_data.items():
+            if hasattr(student, key):
+                setattr(student, key, value)
+        db.commit()
+        db.refresh(student)
+    return student
+
+def delete_student(db: Session, student_id: int) -> bool:
+    student = get_student_by_id(db, student_id)
+    if student:
+        # Delete face embedding first
+        db.query(models.FaceEmbedding).filter(models.FaceEmbedding.student_id == student_id).delete()
+        # Delete attendance records
+        db.query(models.Attendance).filter(models.Attendance.student_id == student_id).delete()
+        # Delete student
+        db.delete(student)
+        db.commit()
+        return True
+    return False
+
+# Teacher UPDATE/DELETE
+def update_teacher(db: Session, teacher_id: int, update_data: dict) -> models.Teacher:
+    teacher = get_teacher_by_id(db, teacher_id)
+    if teacher:
+        for key, value in update_data.items():
+            if key == "password":
+                teacher.password_hash = get_password_hash(value)
+            elif hasattr(teacher, key):
+                setattr(teacher, key, value)
+        db.commit()
+        db.refresh(teacher)
+    return teacher
+
+def delete_teacher(db: Session, teacher_id: int) -> bool:
+    teacher = get_teacher_by_id(db, teacher_id)
+    if teacher:
+        db.delete(teacher)
+        db.commit()
+        return True
+    return False
+
+# Class UPDATE/DELETE
+def update_class(db: Session, class_id: int, update_data: dict) -> models.Class:
+    class_obj = get_class_by_id(db, class_id)
+    if class_obj:
+        for key, value in update_data.items():
+            if hasattr(class_obj, key):
+                setattr(class_obj, key, value)
+        db.commit()
+        db.refresh(class_obj)
+    return class_obj
+
+def delete_class(db: Session, class_id: int) -> bool:
+    class_obj = get_class_by_id(db, class_id)
+    if class_obj:
+        # Delete students in this class (cascade)
+        students = get_students(db, class_id=class_id)
+        for student in students:
+            delete_student(db, student.id)
+        db.delete(class_obj)
+        db.commit()
+        return True
+    return False
+
 # Face Embedding CRUD
 def create_face_embedding(db: Session, student_id: int, embedding: str) -> models.FaceEmbedding:
     # Delete existing embedding if any

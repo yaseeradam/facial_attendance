@@ -107,7 +107,7 @@ class _AttendanceHistoryScreenState extends ConsumerState<AttendanceHistoryScree
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.cardColor.withOpacity(isAbsent ? 0.8 : 1),
+        color: theme.cardColor.withValues(alpha: isAbsent ? 0.8 : 1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[200]!),
       ),
@@ -145,7 +145,7 @@ class _AttendanceHistoryScreenState extends ConsumerState<AttendanceHistoryScree
                     Text(name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isAbsent ? Colors.grey : theme.colorScheme.onSurface)),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                       child: Text(status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold)),
                     ),
                   ],

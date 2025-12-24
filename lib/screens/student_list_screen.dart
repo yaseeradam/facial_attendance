@@ -146,7 +146,7 @@ class StudentListScreen extends ConsumerWidget {
                       Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                        decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
                         child: Text(status, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
                       ),
                     ],

@@ -23,7 +23,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_new),
           style: IconButton.styleFrom(
-            backgroundColor: isDark ? Colors.white10 : Colors.black.withOpacity(0.05),
+            backgroundColor: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
           ),
         ),
         title: const Text("Attendance Reports"),
@@ -169,8 +169,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   end: Alignment.topCenter,
                   colors: [
                     theme.scaffoldBackgroundColor,
-                    theme.scaffoldBackgroundColor.withOpacity(0.8),
-                    theme.scaffoldBackgroundColor.withOpacity(0),
+                    theme.scaffoldBackgroundColor.withValues(alpha: 0.8),
+                    theme.scaffoldBackgroundColor.withValues(alpha: 0),
                   ],
                 ),
               ),
@@ -202,8 +202,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: isPrimary ? [BoxShadow(color: theme.colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))] : [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
-        border: !isPrimary ? Border.all(color: Colors.grey.withOpacity(0.1)) : null,
+        boxShadow: isPrimary ? [BoxShadow(color: theme.colorScheme.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))] : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
+        border: !isPrimary ? Border.all(color: Colors.grey.withValues(alpha: 0.1)) : null,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -278,7 +278,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
+              color: statusColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),

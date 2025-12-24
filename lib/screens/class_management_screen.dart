@@ -15,7 +15,7 @@ class ClassManagementScreen extends ConsumerWidget {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_new),
           style: IconButton.styleFrom(
-            backgroundColor: isDark ? Colors.white10 : Colors.black.withOpacity(0.05),
+            backgroundColor: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
           ),
         ),
         title: const Text("Class Management"),
@@ -169,7 +169,7 @@ class ClassManagementScreen extends ConsumerWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(Icons.class_, color: color, size: 24),

@@ -2,7 +2,7 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from ..db import crud, models
-from ..schemas.student import StudentCreate, StudentResponse
+from ..schemas.student import StudentCreate, StudentUpdate, StudentResponse
 
 class StudentService:
     def __init__(self):
@@ -34,3 +34,32 @@ class StudentService:
     async def get_student_by_student_id(self, student_id: str, db: Session) -> Optional[models.Student]:
         """Get student by student_id"""
         return crud.get_student_by_student_id(db, student_id)
+    
+    async def update_student(self, student_id: int, student_data: StudentUpdate, db: Session) -> models.Student:
+        """Update a student"""
+        student = crud.get_student_by_id(db, student_id)
+        if not student:
+            raise ValueError("Student not found")
+        
+        # If updating student_id, check uniqueness
+        if student_data.student_id and student_data.student_id != student.student_id:
+            existing = crud.get_student_by_student_id(db, student_data.student_id)
+            if existing:
+                raise ValueError("Student ID already exists")
+        
+        # If updating class, verify it exists
+        if student_data.class_id:
+            class_obj = crud.get_class_by_id(db, student_data.class_id)
+            if not class_obj:
+                raise ValueError("Class not found")
+        
+        update_dict = student_data.model_dump(exclude_unset=True)
+        return crud.update_student(db, student_id, update_dict)
+    
+    async def delete_student(self, student_id: int, db: Session) -> bool:
+        """Delete a student"""
+        student = crud.get_student_by_id(db, student_id)
+        if not student:
+            raise ValueError("Student not found")
+        
+        return crud.delete_student(db, student_id)

@@ -76,7 +76,7 @@ class _MarkAttendanceScreen2State extends ConsumerState<MarkAttendanceScreen2> w
                    width: 280,
                    height: 280,
                    decoration: BoxDecoration(
-                     border: Border.all(color: Colors.white.withOpacity(0.5), width: 1),
+                     border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1),
                      borderRadius: BorderRadius.circular(24),
                    ),
                    child: Stack(
@@ -91,7 +91,7 @@ class _MarkAttendanceScreen2State extends ConsumerState<MarkAttendanceScreen2> w
                                height: 260 + (_controller.value * 20),
                                decoration: BoxDecoration(
                                  border: Border.all(
-                                   color: theme.colorScheme.primary.withOpacity(1.0 - _controller.value),
+                                   color: theme.colorScheme.primary.withValues(alpha: 1.0 - _controller.value),
                                    width: 2,
                                  ),
                                  borderRadius: BorderRadius.circular(30),
@@ -136,7 +136,7 @@ class _MarkAttendanceScreen2State extends ConsumerState<MarkAttendanceScreen2> w
              child: OutlinedButton(
                onPressed: () {},
                 style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white.withOpacity(0.1),
+                  backgroundColor: Colors.white.withValues(alpha: 0.1),
                   side: const BorderSide(color: Colors.white30),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

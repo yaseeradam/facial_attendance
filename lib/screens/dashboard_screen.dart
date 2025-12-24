@@ -67,7 +67,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         height: 48,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2), width: 2),
+                          border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2), width: 2),
                           image: const DecorationImage(
                             image: NetworkImage("https://lh3.googleusercontent.com/aida-public/AB6AXuBV0Vj6XKh3-jYfldvqMR3w4vv3pvno_ax7Ta2DmB9HIc-ROclXgKBPvClCvz-OcotLuJySA9ZUi1F-1OrXPy2em8XfIK-rGm-Ccjytx5Bbf8r_5ue5TzWBLHplUlD8sflxHFq3fZj8llRPy-bEw99tiwrR7DyQ7jcGtZ7-mqyD_z6-kIQuZ07PPgL1p1_FIDzkVsv9ulnRhLEWD4pcloQrhXrQEraWXjSeXlUuXlTmU81Xi_scbMwVzmPndf3tcOJB8QxsCV7sZpY"),
                             fit: BoxFit.cover,
@@ -220,7 +220,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           border: Border(top: BorderSide(color: isDark ? Colors.grey[800]! : Colors.grey[200]!)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, -4),
             ),
@@ -253,7 +253,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         border: isOutlined ? Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[200]!) : null,
         boxShadow: !isOutlined ? [
           BoxShadow(
-            color: bg.withOpacity(0.3),
+            color: bg.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -268,7 +268,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isOutlined ? iconBg.withOpacity(isDark ? 0.1 : 1) : Colors.white.withOpacity(0.2),
+                  color: isOutlined ? iconBg.withValues(alpha: isDark ? 0.1 : 1) : Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: isOutlined ? iconColor : Colors.white),
@@ -277,7 +277,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: Text(trend, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -285,7 +285,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Text(label, style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(color: textColor.withValues(alpha: 0.8), fontSize: 14, fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
           Text(value, style: TextStyle(color: textColor, fontSize: 24, fontWeight: FontWeight.bold)),
         ],
@@ -313,7 +313,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 32),
@@ -343,7 +343,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 20),

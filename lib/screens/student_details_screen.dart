@@ -15,7 +15,7 @@ class StudentDetailsScreen extends ConsumerWidget {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_new),
           style: IconButton.styleFrom(
-             backgroundColor: isDark ? Colors.white10 : Colors.black.withOpacity(0.05),
+             backgroundColor: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
           ),
         ),
         title: const Text("Student Profile"),
@@ -94,7 +94,7 @@ class StudentDetailsScreen extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: theme.cardColor,
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
                     ),
                     child: Column(
                       children: [
@@ -117,7 +117,7 @@ class StudentDetailsScreen extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: theme.cardColor,
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
                     ),
                     child: Column(
                       children: [
@@ -170,7 +170,7 @@ class StudentDetailsScreen extends ConsumerWidget {
                         label: const Text("Delete Student", style: TextStyle(color: Colors.red)),
                          style: TextButton.styleFrom(
                            padding: const EdgeInsets.symmetric(vertical: 16),
-                           backgroundColor: Colors.red.withOpacity(0.1),
+                           backgroundColor: Colors.red.withValues(alpha: 0.1),
                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                          ),
                      ),
@@ -193,7 +193,7 @@ class StudentDetailsScreen extends ConsumerWidget {
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [

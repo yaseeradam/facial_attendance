@@ -86,11 +86,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               width: 200,
               height: 200,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(isDark ? 0.1 : 0.05),
+                color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.05),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: theme.colorScheme.primary.withOpacity(isDark ? 0.1 : 0.05),
+                    color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.05),
                     blurRadius: 100,
                     spreadRadius: 50,
                   ),
@@ -105,11 +105,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               width: 250,
               height: 250,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(isDark ? 0.1 : 0.05),
+                color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.05),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: theme.colorScheme.primary.withOpacity(isDark ? 0.1 : 0.05),
+                    color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.05),
                     blurRadius: 100,
                     spreadRadius: 50,
                   ),
@@ -136,7 +136,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: theme.colorScheme.primary.withOpacity(0.1),
+                              color: theme.colorScheme.primary.withValues(alpha: 0.1),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),

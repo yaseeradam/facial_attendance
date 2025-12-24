@@ -39,7 +39,7 @@ class AdminProfileSetupScreen extends ConsumerWidget {
                           image: NetworkImage("https://lh3.googleusercontent.com/aida-public/AB6AXuC01FIzYyy6AyiNCbgdSXcchN49lDFFP2JILDkymHBnG0txkRWTSPfGo8wa_NoDj7BeESLnz5R83u862VpfUpvGcwcHAqB0xRhFhzrANOy-DEs0VNyr868Vm_jrABFYINODblNs0CDrc2SPm8CA0dptPIS3OASFy-9KQ_d0SrPdaodkTULZRsyv7TPUqgUOwQUT2sDmqmxHayqRUM9vJaHDV5Hw7iBLxhsQdnawc8SXza7ro75EKZ2aRQcQYDf2IcQjXHubIMF8_OM"),
                           fit: BoxFit.cover,
                         ),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)],
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
                       ),
                     ),
                     Positioned(
@@ -173,8 +173,8 @@ class AdminProfileSetupScreen extends ConsumerWidget {
                   label: const Text("Log Out", style: TextStyle(color: Colors.red)),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: BorderSide(color: Colors.red.withOpacity(0.3)),
-                    backgroundColor: Colors.red.withOpacity(0.05),
+                    side: BorderSide(color: Colors.red.withValues(alpha: 0.3)),
+                    backgroundColor: Colors.red.withValues(alpha: 0.05),
                     minimumSize: const Size(double.infinity, 50),
                   ),
                 ),

@@ -5,7 +5,6 @@ import '../services/camera_service.dart';
 import '../services/face_detection_service.dart';
 import '../services/api_service.dart';
 import '../widgets/common_widgets.dart';
-import 'dart:io';
 
 class MarkAttendanceScreen1 extends ConsumerStatefulWidget {
   final int classId;
@@ -22,7 +21,6 @@ class _MarkAttendanceScreen1State extends ConsumerState<MarkAttendanceScreen1> w
   bool _isProcessing = false;
   String _statusMessage = "Position face in frame";
   Map<String, dynamic>? _recognizedStudent;
-  File? _capturedImage;
 
   @override
   void initState() {
@@ -60,8 +58,6 @@ class _MarkAttendanceScreen1State extends ConsumerState<MarkAttendanceScreen1> w
     try {
       final image = await CameraService.takePicture();
       if (image != null) {
-        setState(() => _capturedImage = image);
-        
         // Verify face with backend
         final result = await FaceDetectionService.verifyFace(widget.classId, image);
         
@@ -267,7 +263,7 @@ class _MarkAttendanceScreen1State extends ConsumerState<MarkAttendanceScreen1> w
                                     child: Container(
                                       height: 2,
                                       decoration: BoxDecoration(
-                                        color: theme.colorScheme.primary.withOpacity(0.8),
+                                        color: theme.colorScheme.primary.withValues(alpha: 0.8),
                                         boxShadow: [
                                           BoxShadow(color: theme.colorScheme.primary, blurRadius: 10),
                                         ],
@@ -331,7 +327,7 @@ class _MarkAttendanceScreen1State extends ConsumerState<MarkAttendanceScreen1> w
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                              decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
                               child: const Text("Present", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
                             ),
                           ],

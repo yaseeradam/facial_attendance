@@ -8,6 +8,11 @@ class StudentCreate(BaseModel):
     full_name: str
     class_id: int
 
+class StudentUpdate(BaseModel):
+    student_id: Optional[str] = None
+    full_name: Optional[str] = None
+    class_id: Optional[int] = None
+
 class StudentResponse(BaseModel):
     id: int
     student_id: str
