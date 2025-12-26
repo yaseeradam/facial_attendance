@@ -3,7 +3,7 @@ import '../screens/splash_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/student_list_screen.dart';
-import '../screens/register_student_screen.dart';
+import '../screens/register_student_screen_new.dart';
 import '../screens/mark_attendance_screen_1.dart';
 import '../screens/attendance_history_screen.dart';
 import '../screens/reports_screen.dart';
@@ -37,7 +37,7 @@ class AppRoutes {
     login: (context) => const LoginScreen(),
     dashboard: (context) => const DashboardScreen(),
     studentList: (context) => const StudentListScreen(),
-    registerStudent: (context) => const RegisterStudentScreen(),
+    registerStudent: (context) => const RegisterStudentScreenNew(),
     markAttendance: (context) => const MarkAttendanceScreen1(),
     attendanceHistory: (context) => const AttendanceHistoryScreen(),
     reports: (context) => const ReportsScreen(),

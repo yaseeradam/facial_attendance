@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'mark_attendance_screen_1.dart';
-import 'register_student_screen.dart';
+import 'register_student_screen_new.dart';
 import 'reports_screen.dart';
 import 'settings_screen.dart';
 import 'admin_profile_setup_screen.dart';
@@ -306,7 +306,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       children: [
                         _buildActionCard(context, "Register New", Icons.person_add, Colors.blue, 
-                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterStudentScreen()))),
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterStudentScreenNew()))),
                         _buildActionCard(context, "Scan Face", Icons.center_focus_strong, Colors.green,
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarkAttendanceScreen1()))),
                         _buildActionCard(context, "Classes", Icons.class_, Colors.purple,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'student_details_screen.dart';
-import 'register_student_screen.dart';
+import 'register_student_screen_new.dart';
 import '../services/api_service.dart';
 import '../utils/ui_helpers.dart';
 
@@ -135,7 +135,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                         Text('No students found', style: theme.textTheme.titleMedium),
                         const SizedBox(height: 8),
                         TextButton.icon(
-                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterStudentScreen())),
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterStudentScreenNew())),
                           icon: const Icon(Icons.add),
                           label: const Text('Add First Student'),
                         ),
@@ -173,7 +173,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
             right: 16,
             child: FloatingActionButton(
               onPressed: () async {
-                await Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterStudentScreen()));
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterStudentScreenNew()));
                 _loadStudents();
               },
               backgroundColor: theme.colorScheme.primary,

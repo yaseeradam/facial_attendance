@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'dart:io';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../services/api_service.dart';
 import '../utils/ui_helpers.dart';
 
@@ -19,9 +20,35 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
   late AnimationController _bottomSheetController;
   late AnimationController _statusBadgeController;
   late AnimationController _successPulseController;
+  late AnimationController _shimmerController;
   late Animation<double> _bottomSheetAnimation;
   late Animation<double> _statusBadgeAnimation;
   late Animation<double> _successPulseAnimation;
+  late Animation<double> _shimmerAnimation;
+  
+  // ML Kit Face Detection
+  FaceDetector? _faceDetector;
+  bool _isDetectingFaces = false;
+  bool _isProcessingImage = false;
+  
+  // Real-time feedback state
+  String _faceGuidanceMessage = "Position your face in the frame";
+  Color _faceGuidanceColor = Colors.white70;
+  bool _isFaceValid = false;
+  bool _isLivenessVerified = false;
+  double? _headAngleY;
+  double? _headAngleZ;
+  double? _smilingProbability;
+  double? _leftEyeOpenProbability;
+  double? _rightEyeOpenProbability;
+  bool _faceDetected = false;
+  
+  // Auto-capture state
+  DateTime? _lastCaptureTime;
+  bool _hasAutoCapture = false;
+  static const _autoCaptureCooldown = Duration(seconds: 5); // Wait 5 seconds between captures
+  int _readyFrameCount = 0; // Count frames where face is ready
+  static const _requiredReadyFrames = 5; // Need 5 consecutive ready frames
   
   int? _selectedClassId;
   List<Map<String, dynamic>> _classes = [];
@@ -32,6 +59,7 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
   void initState() {
     super.initState();
     _loadClasses();
+    _initializeFaceDetector();
     _initializeCamera();
     
     // Scanning line animation (continuous)
@@ -71,6 +99,28 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
         curve: Curves.easeInOut,
       ),
     );
+    
+    // Shimmer animation for loading state
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+    _shimmerAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _shimmerController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+  
+  void _initializeFaceDetector() {
+    final options = FaceDetectorOptions(
+      enableClassification: true, // Enable smiling and eye detection
+      enableTracking: true,
+      performanceMode: FaceDetectorMode.fast,
+      minFaceSize: 0.15,
+    );
+    _faceDetector = FaceDetector(options: options);
   }
 
   Future<void> _loadClasses() async {
@@ -96,24 +146,228 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
 
       _cameraController = CameraController(
         frontCamera,
-        ResolutionPreset.high,
+        ResolutionPreset.medium, // Use medium for faster processing
         enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.nv21, // Better for ML Kit on Android
       );
 
       await _cameraController!.initialize();
-      if (mounted) setState(() => _isCameraInitialized = true);
+      
+      if (mounted) {
+        setState(() => _isCameraInitialized = true);
+        // Start real-time face detection
+        _startFaceDetection();
+      }
     } catch (e) {
       debugPrint('Camera Error: $e');
     }
   }
+  
+  void _startFaceDetection() {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    
+    _isDetectingFaces = true;
+    _cameraController!.startImageStream((CameraImage image) {
+      if (!_isDetectingFaces || _isProcessingImage || _isScanning) return;
+      _processImageForFaceDetection(image);
+    });
+  }
+  
+  void _stopFaceDetection() {
+    _isDetectingFaces = false;
+    if (_cameraController != null && _cameraController!.value.isStreamingImages) {
+      _cameraController!.stopImageStream();
+    }
+  }
+  
+  Future<void> _processImageForFaceDetection(CameraImage image) async {
+    if (_faceDetector == null || _isProcessingImage) return;
+    
+    _isProcessingImage = true;
+    
+    try {
+      // Convert CameraImage to InputImage for ML Kit
+      final inputImage = _convertCameraImageToInputImage(image);
+      if (inputImage == null) {
+        _isProcessingImage = false;
+        return;
+      }
+      
+      // Detect faces
+      final faces = await _faceDetector!.processImage(inputImage);
+      
+      if (!mounted) {
+        _isProcessingImage = false;
+        return;
+      }
+      
+      _updateFaceGuidance(faces);
+    } catch (e) {
+      debugPrint('Face detection error: $e');
+    }
+    
+    _isProcessingImage = false;
+  }
+  
+  InputImage? _convertCameraImageToInputImage(CameraImage image) {
+    try {
+      final camera = _cameraController!.description;
+      final rotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation);
+      
+      if (rotation == null) return null;
+      
+      // Get the image format
+      final format = InputImageFormatValue.fromRawValue(image.format.raw);
+      if (format == null) return null;
+      
+      // Create input image from bytes
+      final plane = image.planes.first;
+      
+      return InputImage.fromBytes(
+        bytes: plane.bytes,
+        metadata: InputImageMetadata(
+          size: Size(image.width.toDouble(), image.height.toDouble()),
+          rotation: rotation,
+          format: format,
+          bytesPerRow: plane.bytesPerRow,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Image conversion error: $e');
+      return null;
+    }
+  }
+  
+  void _updateFaceGuidance(List<Face> faces) {
+    if (!mounted) return;
+    
+    setState(() {
+      if (faces.isEmpty) {
+        _faceDetected = false;
+        _isFaceValid = false;
+        _isLivenessVerified = false;
+        _faceGuidanceMessage = "No face detected - Position your face in the frame";
+        _faceGuidanceColor = Colors.orange;
+        _headAngleY = null;
+        _headAngleZ = null;
+        _smilingProbability = null;
+        _leftEyeOpenProbability = null;
+        _rightEyeOpenProbability = null;
+        return;
+      }
+      
+      final face = faces.first;
+      _faceDetected = true;
+      
+      // Get head angles
+      _headAngleY = face.headEulerAngleY; // Left-Right rotation
+      _headAngleZ = face.headEulerAngleZ; // Tilt
+      _smilingProbability = face.smilingProbability;
+      _leftEyeOpenProbability = face.leftEyeOpenProbability;
+      _rightEyeOpenProbability = face.rightEyeOpenProbability;
+      
+      // Check head position (thresholds in degrees)
+      const maxYAngle = 15.0; // Max left-right turn
+      const maxZAngle = 10.0; // Max tilt
+      
+      bool isHeadStraight = true;
+      String headMessage = "";
+      
+      if (_headAngleY != null && _headAngleY!.abs() > maxYAngle) {
+        isHeadStraight = false;
+        if (_headAngleY! > 0) {
+          headMessage = "Please look straight - Turn right slightly";
+        } else {
+          headMessage = "Please look straight - Turn left slightly";
+        }
+      }
+      
+      if (_headAngleZ != null && _headAngleZ!.abs() > maxZAngle) {
+        isHeadStraight = false;
+        if (_headAngleZ! > 0) {
+          headMessage = "Please look straight - Tilt head right";
+        } else {
+          headMessage = "Please look straight - Tilt head left";
+        }
+      }
+      
+      // Liveness check - eyes should be open
+      bool eyesOpen = true;
+      if (_leftEyeOpenProbability != null && _rightEyeOpenProbability != null) {
+        eyesOpen = _leftEyeOpenProbability! > 0.5 && _rightEyeOpenProbability! > 0.5;
+      }
+      
+      // Check for smiling (optional liveness indicator)
+      bool hasLivenessIndicator = false;
+      if (_smilingProbability != null && _smilingProbability! > 0.3) {
+        hasLivenessIndicator = true;
+      }
+      if (eyesOpen) {
+        hasLivenessIndicator = true;
+      }
+      
+      // Determine overall face validity
+      _isFaceValid = isHeadStraight && eyesOpen;
+      _isLivenessVerified = hasLivenessIndicator;
+      
+      // Set guidance message and color
+      if (!eyesOpen) {
+        _faceGuidanceMessage = "Please open your eyes";
+        _faceGuidanceColor = Colors.orange;
+        _readyFrameCount = 0; // Reset counter
+      } else if (!isHeadStraight) {
+        _faceGuidanceMessage = headMessage;
+        _faceGuidanceColor = Colors.orange;
+        _readyFrameCount = 0; // Reset counter
+      } else if (_isFaceValid && _isLivenessVerified) {
+        _readyFrameCount++;
+        
+        // Check if we should auto-capture
+        if (_readyFrameCount >= _requiredReadyFrames && !_isScanning && _selectedClassId != null) {
+          final now = DateTime.now();
+          final canCapture = _lastCaptureTime == null || 
+                           now.difference(_lastCaptureTime!) > _autoCaptureCooldown;
+          
+          if (canCapture) {
+            _faceGuidanceMessage = "Capturing...";
+            _faceGuidanceColor = Colors.blue;
+            _lastCaptureTime = now;
+            _readyFrameCount = 0;
+            
+            // Trigger auto-capture
+            Future.microtask(() => _autoCaptureFace());
+          } else {
+            final remaining = _autoCaptureCooldown.inSeconds - now.difference(_lastCaptureTime!).inSeconds;
+            _faceGuidanceMessage = "Ready! Wait ${remaining}s...";
+            _faceGuidanceColor = Colors.green;
+          }
+        } else {
+          _faceGuidanceMessage = "Hold steady... ${_requiredReadyFrames - _readyFrameCount}";
+          _faceGuidanceColor = Colors.green;
+        }
+      } else {
+        _faceGuidanceMessage = "Hold steady...";
+        _faceGuidanceColor = Colors.white70;
+        _readyFrameCount = 0; // Reset counter
+      }
+    });
+  }
+  
+  Future<void> _autoCaptureFace() async {
+    if (_selectedClassId == null || _isScanning) return;
+    await _scanFace();
+  }
 
   @override
   void dispose() {
+    _stopFaceDetection();
     _cameraController?.dispose();
+    _faceDetector?.close();
     _scanAnimationController.dispose();
     _bottomSheetController.dispose();
     _statusBadgeController.dispose();
     _successPulseController.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 
@@ -126,11 +380,8 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
     if (!mounted) return;
     setState(() {
       _isScanning = true;
-      _recognizedStudent = {}; // Empty object to trigger bottom sheet
+      _recognizedStudent = {}; // Empty object to show loading state in bottom sheet
     });
-    
-    // Show bottom sheet immediately with loading state
-    _bottomSheetController.forward();
 
     try {
       final XFile photo = await _cameraController!.takePicture();
@@ -155,7 +406,7 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
         
         UIHelpers.showSuccess(context, "Face recognized successfully!");
       } else {
-        // Show error state in modal
+        // Show error state in bottom sheet - STAYS VISIBLE
         setState(() {
           _recognizedStudent = {
             'error': true,
@@ -163,12 +414,7 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
           };
         });
         
-        // Auto-hide after 2 seconds
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            _resetScan();
-          }
-        });
+        // Error stays visible - user can manually retry or system will auto-capture again if they reposition
       }
     } catch (e) {
       if (mounted) {
@@ -180,23 +426,16 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
           };
         });
         
-        // Auto-hide after 2 seconds
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            _resetScan();
-          }
-        });
+        // Error stays visible - user can manually retry or system will auto-capture again
       }
     }
   }
   
   void _resetScan() {
-    _bottomSheetController.reverse();
     _statusBadgeController.reverse();
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        setState(() => _recognizedStudent = null);
-      }
+    setState(() {
+      _recognizedStudent = null; // Back to shimmer state
+      _readyFrameCount = 0; // Reset auto-capture counter
     });
   }
 
@@ -208,54 +447,44 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF101922) : const Color(0xFFF6F7F8),
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            // Full Screen Layout
-            Column(
-              children: [
-                // Top Navigation with fade in
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0.0, end: 1.0),
-                  duration: const Duration(milliseconds: 400),
-                  builder: (context, value, child) {
-                    return Opacity(
-                      opacity: value,
-                      child: Transform.translate(
-                        offset: Offset(0, 20 * (1 - value)),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: _buildTopNavigation(context, theme, isDark),
-                ),
-                
-                // Camera Viewport - Takes most of the space
-                Expanded(
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0.8, end: 1.0),
-                    duration: const Duration(milliseconds: 600),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, value, child) {
-                      return Transform.scale(
-                        scale: value,
-                        child: Opacity(opacity: value, child: child),
-                      );
-                    },
-                    child: _buildCameraViewport(theme, isDark),
+            // Top Navigation with fade in
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 400),
+              builder: (context, value, child) {
+                return Opacity(
+                  opacity: value,
+                  child: Transform.translate(
+                    offset: Offset(0, 20 * (1 - value)),
+                    child: child,
                   ),
-                ),
-              ],
+                );
+              },
+              child: _buildTopNavigation(context, theme, isDark),
             ),
             
-            // Bottom Sheet with slide animation
-            if (_recognizedStudent != null)
-              SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 1),
-                  end: Offset.zero,
-                ).animate(_bottomSheetAnimation),
-                child: _buildResultBottomSheet(theme, isDark),
+            // Camera Viewport - 50% of screen
+            Expanded(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.8, end: 1.0),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, child) {
+                  return Transform.scale(
+                    scale: value,
+                    child: Opacity(opacity: value, child: child),
+                  );
+                },
+                child: _buildCameraViewport(theme, isDark),
               ),
+            ),
+            
+            // Bottom Sheet - ALWAYS VISIBLE - 50% of screen
+            Expanded(
+              child: _buildPersistentBottomSheet(theme, isDark),
+            ),
           ],
         ),
       ),
@@ -267,15 +496,7 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back_ios_new),
-            style: IconButton.styleFrom(
-              backgroundColor: isDark
-                  ? Colors.white.withOpacity(0.1)
-                  : Colors.black.withOpacity(0.05),
-            ),
-          ),
+          const SizedBox(width: 48), // Balance for symmetry
           const Expanded(
             child: Text(
               "Mark Attendance",
@@ -354,7 +575,94 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Status Badge with animation
+        // Real-time face feedback badge (when scanning not active)
+        if (_recognizedStudent == null)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            margin: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              border: Border.all(
+                color: _faceGuidanceColor.withOpacity(0.3),
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(
+                  color: _faceGuidanceColor.withOpacity(0.2),
+                  blurRadius: 15,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Status icon based on face state
+                Icon(
+                  _faceDetected 
+                      ? (_isFaceValid && _isLivenessVerified 
+                          ? Icons.check_circle 
+                          : Icons.info_outline)
+                      : Icons.face_retouching_off,
+                  color: _faceGuidanceColor,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    _faceGuidanceMessage,
+                    style: TextStyle(
+                      color: _faceGuidanceColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        
+        // Liveness indicator row
+        if (_recognizedStudent == null && _faceDetected)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Eyes status
+                _buildLivenessIndicator(
+                  icon: Icons.visibility,
+                  label: "Eyes",
+                  isValid: _leftEyeOpenProbability != null && 
+                           _rightEyeOpenProbability != null &&
+                           _leftEyeOpenProbability! > 0.5 && 
+                           _rightEyeOpenProbability! > 0.5,
+                ),
+                const SizedBox(width: 16),
+                // Head position status
+                _buildLivenessIndicator(
+                  icon: Icons.face,
+                  label: "Position",
+                  isValid: _headAngleY != null && 
+                           _headAngleZ != null && 
+                           _headAngleY!.abs() <= 15 && 
+                           _headAngleZ!.abs() <= 10,
+                ),
+                const SizedBox(width: 16),
+                // Smile status (optional)
+                _buildLivenessIndicator(
+                  icon: Icons.sentiment_satisfied_alt,
+                  label: "Live",
+                  isValid: _isLivenessVerified,
+                ),
+              ],
+            ),
+          ),
+        
+        // Success badge (after face recognized)
         if (_recognizedStudent != null)
           ScaleTransition(
             scale: _statusBadgeAnimation,
@@ -397,7 +705,7 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
             ),
           ),
         
-        // Face Frame with pulse on success
+        // Face Frame with dynamic border color based on face validity
         AnimatedBuilder(
           animation: _recognizedStudent != null ? _successPulseController : _scanAnimationController,
           builder: (context, child) {
@@ -405,23 +713,41 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
                 ? _successPulseAnimation.value 
                 : 1.0;
             
+            // Determine frame color based on state
+            Color frameColor;
+            double frameWidth;
+            if (_recognizedStudent != null) {
+              frameColor = theme.colorScheme.primary.withOpacity(0.8);
+              frameWidth = 3;
+            } else if (_isFaceValid && _isLivenessVerified) {
+              frameColor = Colors.green.withOpacity(0.8);
+              frameWidth = 2.5;
+            } else if (_faceDetected) {
+              frameColor = Colors.orange.withOpacity(0.6);
+              frameWidth = 2;
+            } else {
+              frameColor = Colors.white.withOpacity(0.2);
+              frameWidth = 1;
+            }
+            
             return Transform.scale(
               scale: scale,
-              child: Container(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
                 width: 280,
                 height: 280,
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: _recognizedStudent != null
-                        ? theme.colorScheme.primary.withOpacity(0.8)
-                        : Colors.white.withOpacity(0.2),
-                    width: _recognizedStudent != null ? 3 : 1,
+                    color: frameColor,
+                    width: frameWidth,
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: _recognizedStudent != null
+                  boxShadow: (_recognizedStudent != null || (_isFaceValid && _isLivenessVerified))
                       ? [
                           BoxShadow(
-                            color: theme.colorScheme.primary.withOpacity(0.4),
+                            color: (_recognizedStudent != null 
+                                ? theme.colorScheme.primary 
+                                : Colors.green).withOpacity(0.4),
                             blurRadius: 30,
                             spreadRadius: 5,
                           ),
@@ -442,10 +768,14 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
                         child: Container(
                           height: 4,
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primary.withOpacity(0.8),
+                            color: (_isFaceValid && _isLivenessVerified)
+                                ? Colors.green.withOpacity(0.8)
+                                : theme.colorScheme.primary.withOpacity(0.8),
                             boxShadow: [
                               BoxShadow(
-                                color: theme.colorScheme.primary.withOpacity(0.8),
+                                color: (_isFaceValid && _isLivenessVerified)
+                                    ? Colors.green.withOpacity(0.8)
+                                    : theme.colorScheme.primary.withOpacity(0.8),
                                 blurRadius: 15,
                                 spreadRadius: 2,
                               ),
@@ -462,20 +792,26 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
         
         const SizedBox(height: 24),
         
-        // Instruction Text with fade animation
+        // Instruction Text with dynamic message
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: Text(
             _recognizedStudent != null
                 ? "Identity Confirmed ✓"
-                : "Hold still for verification",
-            key: ValueKey<bool>(_recognizedStudent != null),
+                : (_isFaceValid && _isLivenessVerified 
+                    ? "Ready to scan!" 
+                    : "Position your face in the frame"),
+            key: ValueKey<String>(_recognizedStudent != null 
+                ? "confirmed" 
+                : (_isFaceValid ? "ready" : "position")),
             style: TextStyle(
               color: _recognizedStudent != null
                   ? Colors.green[300]
-                  : Colors.white70,
+                  : (_isFaceValid && _isLivenessVerified 
+                      ? Colors.green[300] 
+                      : Colors.white70),
               fontSize: 14,
-              fontWeight: _recognizedStudent != null 
+              fontWeight: (_recognizedStudent != null || (_isFaceValid && _isLivenessVerified))
                   ? FontWeight.w600 
                   : FontWeight.w300,
             ),
@@ -529,44 +865,50 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
               ),
             ),
           ),
-        
-        const SizedBox(height: 16),
-        
-        // Scan Button with scale animation on press
-        if (_recognizedStudent == null)
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 700),
-            curve: Curves.elasticOut,
-            builder: (context, value, child) {
-              return Transform.scale(scale: value, child: child);
-            },
-            child: ElevatedButton.icon(
-              onPressed: _isScanning ? null : _scanFace,
-              icon: _isScanning
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.face_retouching_natural),
-              label: Text(_isScanning ? "Scanning..." : "Scan Face"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                elevation: 8,
-                shadowColor: theme.colorScheme.primary.withOpacity(0.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+      ],
+    );
+  }
+  
+  Widget _buildLivenessIndicator({
+    required IconData icon,
+    required String label,
+    required bool isValid,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isValid ? Colors.green.withOpacity(0.5) : Colors.grey.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: isValid ? Colors.green : Colors.grey,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: isValid ? Colors.green : Colors.grey,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
             ),
           ),
-      ],
+          const SizedBox(width: 4),
+          Icon(
+            isValid ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 12,
+            color: isValid ? Colors.green : Colors.grey.withOpacity(0.5),
+          ),
+        ],
+      ),
     );
   }
 
@@ -615,6 +957,105 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
           );
         },
       ),
+    );
+  }
+
+  Widget _buildPersistentBottomSheet(ThemeData theme, bool isDark) {
+    final now = DateTime.now();
+    
+    // Determine state: shimmer (no scan yet), loading (scanning), error, or success
+    final isShimmer = _recognizedStudent == null && !_isScanning;
+    final isLoading = _isScanning && (_recognizedStudent == null || _recognizedStudent!.isEmpty);
+    final isError = _recognizedStudent != null && 
+                    _recognizedStudent!.containsKey('error') && 
+                    _recognizedStudent!['error'] == true;
+    final isSuccess = _recognizedStudent != null && 
+                      !_recognizedStudent!.containsKey('error') && 
+                      _recognizedStudent!.isNotEmpty;
+    
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E2936) : Colors.white,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(32),
+              topRight: Radius.circular(32),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 30,
+                offset: const Offset(0, -8),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Handle with animation
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 400),
+                builder: (context, value, child) {
+                  return Opacity(
+                    opacity: value,
+                    child: Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 12, bottom: 4),
+                        width: 48 * value,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.grey[600] : Colors.grey[300],
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              
+              // Scrollable content area
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Show different content based on state
+                      if (isShimmer) _buildShimmerContent(theme, isDark),
+                      if (isLoading) _buildLoadingState(theme, isDark),
+                      if (isError) _buildErrorState(_recognizedStudent!['message'] ?? 'Unknown error', theme, isDark),
+                      if (isSuccess) ...[ 
+                        _buildAnimatedProfileHeader(_recognizedStudent!, theme, isDark),
+                        const SizedBox(height: 20),
+                        _buildAnimatedStatsGrid(now, theme, isDark),
+                        const SizedBox(height: 16),
+                        _buildAnimatedActionButtons(_recognizedStudent!, theme, isDark),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
+  Widget _buildShimmerContent(ThemeData theme, bool isDark) {
+    return Column(
+      children: [
+        // Shimmer profile header
+        _buildShimmerProfileHeader(theme, isDark),
+        const SizedBox(height: 24),
+        // Shimmer stats grid
+        _buildShimmerStatsGrid(theme, isDark),
+        const SizedBox(height: 20),
+        // Shimmer action buttons
+        _buildShimmerActionButtons(theme, isDark),
+      ],
     );
   }
 
@@ -690,95 +1131,196 @@ class _MarkAttendanceScreen1State extends State<MarkAttendanceScreen1>
   }
   
   Widget _buildLoadingState(ThemeData theme, bool isDark) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 500),
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-              // Scanning animation
-              SizedBox(
-                width: 60,
-                height: 60,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                "Scanning Face...",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                "Please wait while we verify your identity",
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              // Skeleton loaders for upcoming content
-              _buildSkeletonLoader(theme, isDark),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
+    return Column(
+      children: [
+        // Shimmer profile header - matching success state structure
+        _buildShimmerProfileHeader(theme, isDark),
+        const SizedBox(height: 24),
+        // Shimmer stats grid - matching success state structure
+        _buildShimmerStatsGrid(theme, isDark),
+        const SizedBox(height: 20),
+        // Shimmer action buttons - matching success state structure
+        _buildShimmerActionButtons(theme, isDark),
+      ],
     );
   }
   
-  Widget _buildSkeletonLoader(ThemeData theme, bool isDark) {
-    return Column(
+  Widget _buildShimmerProfileHeader(ThemeData theme, bool isDark) {
+    return Row(
       children: [
-        Row(
+        // Shimmer profile picture
+        _buildShimmerContainer(
+          width: 64,
+          height: 64,
+          isDark: isDark,
+          isCircle: true,
+        ),
+        const SizedBox(width: 16),
+        
+        // Shimmer name and ID
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildShimmerContainer(
+                width: double.infinity,
+                height: 24,
+                isDark: isDark,
+                borderRadius: 6,
+              ),
+              const SizedBox(height: 8),
+              _buildShimmerContainer(
+                width: 120,
+                height: 16,
+                isDark: isDark,
+                borderRadius: 4,
+              ),
+            ],
+          ),
+        ),
+        
+        // Shimmer status badge
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // Avatar skeleton
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark ? Colors.grey[800] : Colors.grey[200],
-              ),
+            _buildShimmerContainer(
+              width: 80,
+              height: 24,
+              isDark: isDark,
+              borderRadius: 12,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.grey[800] : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 150,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.grey[800] : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ],
-              ),
+            const SizedBox(height: 6),
+            _buildShimmerContainer(
+              width: 60,
+              height: 14,
+              isDark: isDark,
+              borderRadius: 4,
             ),
           ],
         ),
       ],
+    );
+  }
+  
+  Widget _buildShimmerStatsGrid(ThemeData theme, bool isDark) {
+    return Row(
+      children: [
+        Expanded(child: _buildShimmerStatCard(theme, isDark)),
+        const SizedBox(width: 16),
+        Expanded(child: _buildShimmerStatCard(theme, isDark)),
+      ],
+    );
+  }
+  
+  Widget _buildShimmerStatCard(ThemeData theme, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF101922) : const Color(0xFFF6F7F8),
+        borderRadius: BorderRadius.circular(16),
+        border: isDark ? Border.all(color: Colors.grey[800]!) : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _buildShimmerContainer(
+                width: 20,
+                height: 20,
+                isDark: isDark,
+                borderRadius: 4,
+              ),
+              const SizedBox(width: 8),
+              _buildShimmerContainer(
+                width: 60,
+                height: 14,
+                isDark: isDark,
+                borderRadius: 4,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildShimmerContainer(
+            width: 80,
+            height: 24,
+            isDark: isDark,
+            borderRadius: 4,
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildShimmerActionButtons(ThemeData theme, bool isDark) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildShimmerContainer(
+            width: double.infinity,
+            height: 48,
+            isDark: isDark,
+            borderRadius: 12,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 2,
+          child: _buildShimmerContainer(
+            width: double.infinity,
+            height: 48,
+            isDark: isDark,
+            borderRadius: 12,
+            isPrimary: true,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildShimmerContainer({
+    required double width,
+    required double height,
+    required bool isDark,
+    double borderRadius = 8,
+    bool isCircle = false,
+    bool isPrimary = false,
+  }) {
+    return AnimatedBuilder(
+      animation: _shimmerAnimation,
+      builder: (context, child) {
+        // Create shimmer wave effect moving from left to right
+        final shimmerValue = _shimmerAnimation.value;
+        // Create a pulsing effect
+        final pulseValue = (shimmerValue * 2 - 1).abs();
+        
+        return Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
+            borderRadius: isCircle ? null : BorderRadius.circular(borderRadius),
+            gradient: LinearGradient(
+              begin: Alignment(-1.0 + shimmerValue * 2, 0),
+              end: Alignment(0 + shimmerValue * 2, 0),
+              colors: isPrimary
+                  ? [
+                      Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                      Theme.of(context).colorScheme.primary.withOpacity(0.35 + pulseValue * 0.15),
+                      Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    ]
+                  : [
+                      isDark ? Colors.grey[800]! : Colors.grey[300]!,
+                      isDark 
+                          ? Colors.grey[600]! 
+                          : Colors.grey[100]!,
+                      isDark ? Colors.grey[800]! : Colors.grey[300]!,
+                    ],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+          ),
+        );
+      },
     );
   }
   

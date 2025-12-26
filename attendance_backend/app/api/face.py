@@ -21,11 +21,16 @@ async def register_face(
     current_user: dict = Depends(require_teacher)
 ):
     """Register a face for a student"""
-    # Validate file type
-    if not file.content_type.startswith('image/'):
+    # Validate file type - be lenient since camera captures may not have proper MIME type
+    allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp']
+    is_image_type = file.content_type and file.content_type.startswith('image/')
+    has_image_ext = any(file.filename.lower().endswith(ext) for ext in allowed_extensions) if file.filename else False
+    is_octet_stream = file.content_type == 'application/octet-stream'  # Sometimes sent by camera
+    
+    if not (is_image_type or has_image_ext or is_octet_stream):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be an image"
+            detail=f"File must be an image. Got: {file.content_type}, filename: {file.filename}"
         )
     
     try:
@@ -60,11 +65,16 @@ async def verify_face(
     if not has_access:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this class")
     
-    # Validate file type
-    if not file.content_type.startswith('image/'):
+    # Validate file type - be lenient since camera captures may not have proper MIME type
+    allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp']
+    is_image_type = file.content_type and file.content_type.startswith('image/')
+    has_image_ext = any(file.filename.lower().endswith(ext) for ext in allowed_extensions) if file.filename else False
+    is_octet_stream = file.content_type == 'application/octet-stream'
+    
+    if not (is_image_type or has_image_ext or is_octet_stream):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be an image"
+            detail=f"File must be an image. Got: {file.content_type}, filename: {file.filename}"
         )
     
     try:
