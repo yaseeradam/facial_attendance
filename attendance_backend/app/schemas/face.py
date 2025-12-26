@@ -14,6 +14,7 @@ class FaceVerifyResponse(BaseModel):
     student_name: Optional[str] = None
     confidence_score: Optional[float] = None
     attendance_marked: Optional[bool] = None
+    photo_path: Optional[str] = None
 
 class FaceVerifyRequest(BaseModel):
     class_id: int
