@@ -6,10 +6,16 @@ from ..ai.matcher import find_best_match
 from ..db import crud
 from ..utils.image_utils import preprocess_image, validate_image_format, resize_image_if_needed
 import numpy as np
+import os
+import uuid
+
+# Directory to save student photos
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads", "students")
 
 class FaceService:
     def __init__(self):
-        pass
+        # Ensure upload directory exists
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
     
     async def register_face(self, image_data: bytes, student_id: int, db: Session) -> Tuple[bool, str]:
         """Register a face for a student
@@ -33,6 +39,12 @@ class FaceService:
             if not is_valid:
                 return False, message
             
+            # Save the photo as student profile picture
+            photo_filename = f"{student_id}_{uuid.uuid4().hex[:8]}.jpg"
+            photo_path = os.path.join(UPLOAD_DIR, photo_filename)
+            with open(photo_path, 'wb') as f:
+                f.write(image_data)
+            
             # Preprocess image
             image = preprocess_image(image_data)
             if image is None:
@@ -49,8 +61,8 @@ class FaceService:
             # Save embedding to database
             crud.create_face_embedding(db, student_id, embedding_json)
             
-            # Update student face_enrolled status
-            crud.update_student_face_enrolled(db, student_id, True)
+            # Update student face_enrolled status and photo_path
+            crud.update_student_face_enrolled(db, student_id, True, photo_path=f"students/{photo_filename}")
             
             return True, "Face registered successfully"
             

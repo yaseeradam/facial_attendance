@@ -73,10 +73,12 @@ def get_students(db: Session, class_id: Optional[int] = None) -> List[models.Stu
         query = query.filter(models.Student.class_id == class_id)
     return query.all()
 
-def update_student_face_enrolled(db: Session, student_id: int, enrolled: bool) -> models.Student:
+def update_student_face_enrolled(db: Session, student_id: int, enrolled: bool, photo_path: str = None) -> models.Student:
     student = get_student_by_id(db, student_id)
     if student:
         student.face_enrolled = enrolled
+        if photo_path:
+            student.photo_path = photo_path
         db.commit()
         db.refresh(student)
     return student

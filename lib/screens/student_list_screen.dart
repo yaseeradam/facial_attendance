@@ -29,11 +29,17 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     setState(() => _isLoading = true);
     
     final result = await ApiService.getStudents();
+    debugPrint('📚 Students API Result: ${result['success']}');
     if (!mounted) return;
     
     if (result['success']) {
+      final students = List<Map<String, dynamic>>.from(result['data'] ?? []);
+      // Log first student to see structure
+      if (students.isNotEmpty) {
+        debugPrint('📚 First student data: ${students.first}');
+      }
       setState(() {
-        _students = List<Map<String, dynamic>>.from(result['data'] ?? []);
+        _students = students;
         _isLoading = false;
       });
     } else {
@@ -44,14 +50,18 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
 
   List<Map<String, dynamic>> get _filteredStudents {
     return _students.where((student) {
-      final name = student['name']?.toString().toLowerCase() ?? '';
+      // Support both 'name' and 'full_name' fields
+      final name = (student['full_name'] ?? student['name'] ?? '').toString().toLowerCase();
       final studentId = student['student_id']?.toString().toLowerCase() ?? '';
       final matchesSearch = name.contains(_searchQuery.toLowerCase()) || 
                            studentId.contains(_searchQuery.toLowerCase());
       
+      // Check for face registration using 'face_enrolled' boolean field
+      final hasFace = student['face_enrolled'] == true;
+      
       if (_filterStatus == 'all') return matchesSearch;
-      if (_filterStatus == 'registered') return matchesSearch && student['face_encoding'] != null;
-      if (_filterStatus == 'pending') return matchesSearch && student['face_encoding'] == null;
+      if (_filterStatus == 'registered') return matchesSearch && hasFace;
+      if (_filterStatus == 'pending') return matchesSearch && !hasFace;
       return matchesSearch;
     }).toList();
   }
@@ -151,10 +161,13 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                         return const SizedBox(height: 100);
                       }
                       final student = _filteredStudents[index];
-                      final hasFace = student['face_encoding'] != null;
+                      // Check face_enrolled boolean instead of face_encoding
+                      final hasFace = student['face_enrolled'] == true;
+                      // Support both name and full_name fields
+                      final studentName = student['full_name'] ?? student['name'] ?? 'Unknown';
                       return _buildStudentCard(
                         context,
-                        student['name'] ?? 'Unknown',
+                        studentName,
                         "ID: ${student['student_id']} • ${student['class_name'] ?? 'No Class'}",
                         hasFace ? "Registered" : "Pending",
                         hasFace ? Colors.green : Colors.orange,
@@ -201,6 +214,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
   Widget _buildStudentCard(BuildContext context, String name, String subtitle, String status, Color statusColor, String? imageUrl, Map<String, dynamic> student) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isRegistered = statusColor == Colors.green;
     
     return InkWell(
       onTap: () {
@@ -216,15 +230,36 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
         ),
         child: Row(
           children: [
+            // Avatar - show photo if available, otherwise colored initials/checkmark
             Container(
               width: 56,
               height: 56,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.grey[200],
-                image: imageUrl != null ? DecorationImage(image: NetworkImage('${ApiService.baseUrl}/uploads/$imageUrl'), fit: BoxFit.cover) : null,
+                color: isRegistered ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                border: Border.all(
+                  color: isRegistered ? Colors.green.withOpacity(0.3) : Colors.orange.withOpacity(0.3),
+                  width: 2,
+                ),
+                // Show photo if available
+                image: (imageUrl != null && imageUrl.isNotEmpty) ? DecorationImage(
+                  image: NetworkImage('${ApiService.baseUrl}/uploads/$imageUrl'),
+                  fit: BoxFit.cover,
+                  onError: (exception, stackTrace) {},
+                ) : null,
               ),
-              child: imageUrl == null ? Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: theme.colorScheme.primary))) : null,
+              child: (imageUrl == null || imageUrl.isEmpty) ? Center(
+                child: isRegistered
+                    ? Icon(Icons.check_circle, color: Colors.green, size: 28)
+                    : Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?', 
+                        style: TextStyle(
+                          fontSize: 22, 
+                          fontWeight: FontWeight.bold, 
+                          color: Colors.orange[700],
+                        ),
+                      ),
+              ) : null,
             ),
             const SizedBox(width: 16),
             Expanded(

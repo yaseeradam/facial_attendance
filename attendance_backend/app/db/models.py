@@ -40,6 +40,7 @@ class Student(Base):
     full_name = Column(String, nullable=False)
     class_id = Column(Integer, ForeignKey("classes.id"), nullable=False)
     face_enrolled = Column(Boolean, default=False)
+    photo_path = Column(String, nullable=True)  # Profile picture path
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships

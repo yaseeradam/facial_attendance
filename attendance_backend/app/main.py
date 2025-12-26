@@ -1,7 +1,9 @@
 """App entry point"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+import os
 from .core.config import settings
 from .db.base import engine, Base
 from .ai.insightface_model import face_model
@@ -9,6 +11,11 @@ from .api import auth, teachers, classes, students, attendance, face, dashboard,
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+
+# Create uploads directory if it doesn't exist
+UPLOADS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+os.makedirs(os.path.join(UPLOADS_DIR, "students"), exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,6 +52,9 @@ app.include_router(attendance.router)
 app.include_router(face.router)
 app.include_router(dashboard.router)
 app.include_router(reports.router)
+
+# Mount static files for uploads (student photos)
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 @app.get("/")
 def root():

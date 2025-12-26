@@ -93,13 +93,23 @@ class _ScanAttendanceScreenState extends State<ScanAttendanceScreen>
   }
 
   Future<void> _loadClasses() async {
+    debugPrint('📚 Loading classes...');
     final result = await ApiService.getClasses();
     if (!mounted) return;
     
     if (result['success']) {
+      final classes = List<Map<String, dynamic>>.from(result['data'] ?? []);
+      debugPrint('📚 Loaded ${classes.length} classes');
       setState(() {
-        _classes = List<Map<String, dynamic>>.from(result['data'] ?? []);
+        _classes = classes;
+        // Auto-select first class if none selected
+        if (_selectedClassId == null && classes.isNotEmpty) {
+          _selectedClassId = classes.first['id'];
+          debugPrint('📚 Auto-selected class: $_selectedClassId');
+        }
       });
+    } else {
+      debugPrint('❌ Failed to load classes: ${result['error']}');
     }
   }
 
@@ -261,23 +271,32 @@ class _ScanAttendanceScreenState extends State<ScanAttendanceScreen>
         _readyFrameCount = 0;
       } else if (_isFaceValid && _isLivenessVerified) {
         _readyFrameCount++;
+        debugPrint('📊 Ready frames: $_readyFrameCount / $_requiredReadyFrames, classId: $_selectedClassId, isScanning: $_isScanning');
         
-        if (_readyFrameCount >= _requiredReadyFrames && !_isScanning && _selectedClassId != null) {
-          final now = DateTime.now();
-          final canCapture = _lastCaptureTime == null || 
-                           now.difference(_lastCaptureTime!) > _autoCaptureCooldown;
-          
-          if (canCapture) {
-            _faceGuidanceMessage = "Capturing...";
-            _faceGuidanceColor = Colors.blue;
-            _lastCaptureTime = now;
-            _readyFrameCount = 0;
+        if (_readyFrameCount >= _requiredReadyFrames) {
+          // Check if class is selected
+          if (_selectedClassId == null) {
+            _faceGuidanceMessage = "⚠️ Select a class first!";
+            _faceGuidanceColor = Colors.red;
+            _readyFrameCount = 0; // Reset to allow retry
+          } else if (!_isScanning) {
+            final now = DateTime.now();
+            final canCapture = _lastCaptureTime == null || 
+                             now.difference(_lastCaptureTime!) > _autoCaptureCooldown;
             
-            Future.microtask(() => _autoCaptureFace());
-          } else {
-            final remaining = _autoCaptureCooldown.inSeconds - now.difference(_lastCaptureTime!).inSeconds;
-            _faceGuidanceMessage = "Ready! Wait ${remaining}s...";
-            _faceGuidanceColor = Colors.green;
+            if (canCapture) {
+              debugPrint('🚀 TRIGGERING CAPTURE NOW!');
+              _faceGuidanceMessage = "Capturing...";
+              _faceGuidanceColor = Colors.blue;
+              _lastCaptureTime = now;
+              _readyFrameCount = 0;
+              
+              Future.microtask(() => _autoCaptureFace());
+            } else {
+              final remaining = _autoCaptureCooldown.inSeconds - now.difference(_lastCaptureTime!).inSeconds;
+              _faceGuidanceMessage = "Ready! Wait ${remaining}s...";
+              _faceGuidanceColor = Colors.green;
+            }
           }
         } else {
           _faceGuidanceMessage = "Hold steady... ${_requiredReadyFrames - _readyFrameCount}";
@@ -313,7 +332,8 @@ class _ScanAttendanceScreenState extends State<ScanAttendanceScreen>
       return;
     }
 
-    if (!mounted) return;
+    if (!mounted || _isScanning) return;
+    
     setState(() {
       _isScanning = true;
       _recognizedStudent = {}; // Empty to show loading
@@ -322,18 +342,30 @@ class _ScanAttendanceScreenState extends State<ScanAttendanceScreen>
     _cardSlideController.forward();
 
     try {
-      final XFile photo = await _cameraController!.takePicture();
+      // IMPORTANT: Stop image stream before taking picture
+      _stopFaceDetection();
       
+      // Wait for stream to fully stop
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      debugPrint('📸 Taking picture for face verification...');
+      final XFile photo = await _cameraController!.takePicture();
+      debugPrint('📸 Picture taken: ${photo.path}');
+      
+      debugPrint('🔍 Calling API to verify face for class $_selectedClassId');
       final result = await ApiService.verifyFace(
         classId: _selectedClassId!,
         imageFile: File(photo.path),
       );
+      
+      debugPrint('🔍 API Result: $result');
 
       if (!mounted) return;
       setState(() => _isScanning = false);
 
-      if (result['success']) {
+      if (result['success'] && result['data'] != null) {
         // Student recognized - show details
+        debugPrint('✅ Student recognized: ${result['data']}');
         setState(() => _recognizedStudent = result['data']);
         
         _successPulseController.forward().then((_) {
@@ -342,22 +374,39 @@ class _ScanAttendanceScreenState extends State<ScanAttendanceScreen>
         
         UIHelpers.showSuccess(context, "Attendance marked successfully!");
       } else {
-        // Not recognized
+        // Not recognized - show red error card
+        debugPrint('❌ Face not recognized: ${result['error']}');
         setState(() {
           _recognizedStudent = {
             'error': true,
-            'message': result['error'] ?? 'Face not recognized'
+            'message': result['error'] ?? 'Face not recognized in database'
           };
         });
       }
+      
+      // Restart face detection after a short delay
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted && _cameraController != null && _cameraController!.value.isInitialized) {
+          _startFaceDetection();
+        }
+      });
+      
     } catch (e) {
+      debugPrint('❌ Scan Error: $e');
       if (mounted) {
         setState(() {
           _isScanning = false;
           _recognizedStudent = {
             'error': true,
-            'message': "Scan Error: $e"
+            'message': "Scan Error: ${e.toString()}"
           };
+        });
+        
+        // Restart face detection
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted && _cameraController != null) {
+            _startFaceDetection();
+          }
         });
       }
     }
