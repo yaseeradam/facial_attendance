@@ -58,6 +58,24 @@ class FaceService:
             if embedding_json is None:
                 return False, embed_message
             
+            # Check if face is already registered
+            target_embedding = embedding_from_json(embedding_json)
+            all_embeddings = crud.get_all_face_embeddings(db)
+            
+            candidates = []
+            for face_embed in all_embeddings:
+                # Skip checking against the student's own previous embedding if it exists (re-enrollment)
+                if face_embed.student_id == student_id:
+                    continue
+                candidate_embedding = embedding_from_json(face_embed.embedding)
+                candidates.append((face_embed.student_id, candidate_embedding))
+            
+            if candidates:
+                best_id, best_sim, is_match = find_best_match(target_embedding, candidates)
+                if is_match:
+                    existing_student = crud.get_student_by_id(db, best_id)
+                    return False, f"Face already registered for student: {existing_student.full_name} (Similarity: {best_sim:.2f})"
+            
             # Save embedding to database
             crud.create_face_embedding(db, student_id, embedding_json)
             
@@ -69,20 +87,20 @@ class FaceService:
         except Exception as e:
             return False, f"Error registering face: {str(e)}"
     
-    async def verify_face(self, image_data: bytes, class_id: int, db: Session) -> Tuple[bool, str, Optional[int], Optional[float]]:
-        """Verify a face against enrolled students in a class
+    async def verify_face(self, image_data: bytes, db: Session, class_id: Optional[int] = None) -> Tuple[bool, str, Optional[int], Optional[float]]:
+        """Verify a face against enrolled students, optionally filtered by class
         
         Args:
             image_data: Raw image bytes
-            class_id: Class ID to search within
             db: Database session
+            class_id: Optional Class ID to search within
             
         Returns:
             Tuple[success, message, student_id, confidence_score]
         """
         try:
             print(f"\n{'='*60}")
-            print(f"🔍 FACE VERIFICATION STARTED for class {class_id}")
+            print(f"🔍 FACE VERIFICATION STARTED {'for class ' + str(class_id) if class_id else 'GLOBAL SEARCH'}")
             print(f"{'='*60}")
             
             # Validate image format
@@ -110,13 +128,17 @@ class FaceService:
             print(f"✅ Embedding generated successfully (length: {len(embedding_json)} chars)")
             target_embedding = embedding_from_json(embedding_json)
             
-            # Get all face embeddings for students in this class
-            print(f"📚 Fetching enrolled faces for class {class_id}...")
-            face_embeddings = crud.get_all_face_embeddings_by_class(db, class_id)
+            # Get face embeddings
+            if class_id:
+                print(f"📚 Fetching enrolled faces for class {class_id}...")
+                face_embeddings = crud.get_all_face_embeddings_by_class(db, class_id)
+            else:
+                print(f"📚 Fetching ALL enrolled faces...")
+                face_embeddings = crud.get_all_face_embeddings(db)
             
             if not face_embeddings:
-                print(f"⚠️ No enrolled faces found in class {class_id}")
-                return False, "No enrolled faces found in this class", None, None
+                print(f"⚠️ No enrolled faces found")
+                return False, "No enrolled faces found", None, None
             
             print(f"✅ Found {len(face_embeddings)} enrolled face(s)")
             
@@ -125,7 +147,6 @@ class FaceService:
             for face_embed in face_embeddings:
                 candidate_embedding = embedding_from_json(face_embed.embedding)
                 candidates.append((face_embed.student_id, candidate_embedding))
-                print(f"  - Student ID {face_embed.student_id} added to candidates")
             
             # Find best match
             print("\n🎯 Starting face matching...")

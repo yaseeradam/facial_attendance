@@ -1,5 +1,6 @@
 """Face registration and verification endpoints"""
 from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends, Form
+from typing import Optional
 from sqlalchemy.orm import Session
 from ..core.security import require_teacher
 from ..db.base import get_db
@@ -54,16 +55,18 @@ async def register_face(
 
 @router.post("/verify", response_model=FaceVerifyResponse)
 async def verify_face(
-    class_id: int = Form(...),
+    class_id: Optional[int] = Form(None),
+    auto_mark: bool = Form(False),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_teacher)
 ):
-    """Verify a face and mark attendance if recognized"""
-    # Check if teacher has access to this class
-    has_access = await class_service.check_teacher_access(class_id, current_user["user_id"], db)
-    if not has_access:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this class")
+    """Verify a face and optionally mark attendance if recognized"""
+    # Check if teacher has access to this class IF class_id provided
+    if class_id:
+        has_access = await class_service.check_teacher_access(class_id, current_user["user_id"], db)
+        if not has_access:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this class")
     
     # Validate file type - be lenient since camera captures may not have proper MIME type
     allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp']
@@ -82,36 +85,39 @@ async def verify_face(
         image_data = await file.read()
         
         # Verify face
-        success, message, student_id, confidence_score = await face_service.verify_face(image_data, class_id, db)
+        success, message, student_id, confidence_score = await face_service.verify_face(image_data, db, class_id)
         
         attendance_marked = False
         student_name = None
         photo_path = None
+        target_class_id = None
         
         if success and student_id:
-            try:
-                # Mark attendance
-                await attendance_service.mark_attendance(student_id, class_id, confidence_score, db)
-                attendance_marked = True
+            from ..db import crud
+            student = crud.get_student_by_id(db, student_id)
+            if student:
+                student_name = student.full_name
+                photo_path = student.photo_path
                 
-                # Get student name and photo
-                from ..db import crud
-                student = crud.get_student_by_id(db, student_id)
-                if student:
-                    student_name = student.full_name
-                    photo_path = student.photo_path
-                    
-            except ValueError as e:
-                # Attendance already marked or other error
-                if "already marked" in str(e):
-                    attendance_marked = False
-                    message += " (Attendance already marked today)"
-                    # Still get student info for display
-                    from ..db import crud
-                    student = crud.get_student_by_id(db, student_id)
-                    if student:
-                        student_name = student.full_name
-                        photo_path = student.photo_path
+                # Determine class_id if not provided
+                target_class_id = class_id if class_id else student.class_id
+                
+                # Check status
+                is_marked = crud.check_attendance_exists(db, student_id, target_class_id)
+                attendance_marked = is_marked
+                
+                if auto_mark and not is_marked:
+                    try:
+                        # Mark attendance
+                        await attendance_service.mark_attendance(student_id, target_class_id, confidence_score, db)
+                        attendance_marked = True
+                        message += " (Attendance marked)"
+                    except ValueError as e:
+                         # Should not happen given check above, but safe to catch
+                         pass
+                elif is_marked:
+                    message = f"Face recognized: {student_name} (Already present)"
+
         
         return FaceVerifyResponse(
             success=success,
@@ -120,7 +126,8 @@ async def verify_face(
             student_name=student_name,
             confidence_score=confidence_score,
             attendance_marked=attendance_marked,
-            photo_path=photo_path
+            photo_path=photo_path,
+            class_id=target_class_id
         )
         
     except Exception as e:

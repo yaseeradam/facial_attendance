@@ -172,6 +172,10 @@ def get_all_face_embeddings_by_class(db: Session, class_id: int) -> List[models.
         models.Student.class_id == class_id
     ).all()
 
+def get_all_face_embeddings(db: Session) -> List[models.FaceEmbedding]:
+    return db.query(models.FaceEmbedding).all()
+
+
 # Attendance CRUD
 def create_attendance(db: Session, student_id: int, class_id: int, confidence_score: float = None) -> models.Attendance:
     db_attendance = models.Attendance(

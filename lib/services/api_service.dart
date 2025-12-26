@@ -298,14 +298,20 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> verifyFace({
-    required int classId,
+    int? classId,
+    bool autoMark = false,
     required File imageFile,
   }) async {
+    final fields = {'auto_mark': autoMark.toString()};
+    if (classId != null) {
+      fields['class_id'] = classId.toString();
+    }
+    
     return await _makeRequest(
       'POST',
       '/face/verify',
       file: imageFile,
-      fields: {'class_id': classId.toString()},
+      fields: fields,
     );
   }
 
