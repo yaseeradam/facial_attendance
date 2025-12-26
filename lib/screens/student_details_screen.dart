@@ -145,9 +145,9 @@ class _StudentDetailsScreenState extends ConsumerState<StudentDetailsScreen> {
                               color: Colors.grey[200],
                             ),
                             child: ClipOval(
-                              child: _student['profile_image'] != null
+                              child: _student['photo_path'] != null && _student['photo_path'].toString().isNotEmpty
                                 ? Image.network(
-                                    "${ApiService.baseUrl}/uploads/${_student['profile_image']}",
+                                    "${ApiService.baseUrl}/uploads/${_student['photo_path']}",
                                     fit: BoxFit.cover,
                                     errorBuilder: (c, o, s) => const Icon(Icons.person, size: 60, color: Colors.grey),
                                   )
