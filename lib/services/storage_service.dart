@@ -9,12 +9,16 @@ class StorageService {
   static SharedPreferences? _prefs;
   static Database? _database;
 
+  static bool _initialized = false;
+
   static Future<void> initialize() async {
+    if (_initialized) return;
     _prefs = await SharedPreferences.getInstance();
     // Skip database initialization on web since sqflite doesn't support web
     if (!kIsWeb) {
       await _initDatabase();
     }
+    _initialized = true;
   }
 
   static Future<void> _initDatabase() async {

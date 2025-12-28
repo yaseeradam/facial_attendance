@@ -16,13 +16,37 @@ class StudentDetailsScreen extends ConsumerStatefulWidget {
 class _StudentDetailsScreenState extends ConsumerState<StudentDetailsScreen> {
   late Map<String, dynamic> _student;
   bool _isLoading = false;
+  bool _isLoadingStats = false;
+  Map<String, dynamic> _stats = {};
 
   @override
   void initState() {
     super.initState();
     _student = widget.student;
-    if (_student.isEmpty) {
-      // Handle empty student if navigated directly (shouldn't happen often)
+    if (_student.isNotEmpty) {
+      _fetchStats();
+    }
+  }
+
+  Future<void> _fetchStats() async {
+    setState(() => _isLoadingStats = true);
+    try {
+      // Fetch last 30 days by default
+      final result = await ApiService.getStudentReport(
+        _student['id'],
+      );
+      
+      if (mounted) {
+        if (result['success'] == true && result['data'] != null) {
+          setState(() {
+            _stats = Map<String, dynamic>.from(result['data']);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading stats: $e");
+    } finally {
+      if (mounted) setState(() => _isLoadingStats = false);
     }
   }
 
@@ -179,16 +203,23 @@ class _StudentDetailsScreenState extends ConsumerState<StudentDetailsScreen> {
                   const SizedBox(height: 32),
                   
                   // Stats Row (Mock values for now as backend doesn't return them yet)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                      children: [
-                        _buildStatItem(context, "85%", "Attendance", Colors.blue),
-                        _buildStatItem(context, "12", "Late", Colors.orange),
-                        _buildStatItem(context, "3", "Absent", Colors.red),
-                      ],
+                  // Stats Row
+                  if (_isLoadingStats)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Row(
+                        children: [
+                          _buildStatItem(context, "${_stats['attendance_rate'] ?? 0}%", "Attendance", Colors.blue),
+                          _buildStatItem(context, "${_stats['days_present'] ?? 0}", "Present", Colors.green),
+                          _buildStatItem(context, "${_stats['days_absent'] ?? 0}", "Absent", Colors.red),
+                        ],
+                      ),
                     ),
-                  ),
                   
                   const SizedBox(height: 32),
                   

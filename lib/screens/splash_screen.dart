@@ -34,7 +34,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Future<void> _initializeApp() async {
     try {
       setState(() => _loadingText = "Loading storage...");
-      await Future.delayed(const Duration(milliseconds: 500));
+      await StorageService.initialize();
       
       setState(() => _loadingText = "Checking authentication...");
       final token = await StorageService.getToken();

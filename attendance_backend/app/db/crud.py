@@ -207,11 +207,17 @@ def check_attendance_exists(db: Session, student_id: int, class_id: int, check_d
     if not check_date:
         check_date = date.today()
     
+    # Create start and end of day daterange
+    from datetime import datetime
+    start_of_day = datetime.combine(check_date, datetime.min.time())
+    end_of_day = datetime.combine(check_date, datetime.max.time())
+    
     return db.query(models.Attendance).filter(
         and_(
             models.Attendance.student_id == student_id,
             models.Attendance.class_id == class_id,
-            func.date(models.Attendance.marked_at) == check_date
+            models.Attendance.marked_at >= start_of_day,
+            models.Attendance.marked_at <= end_of_day
         )
     ).first() is not None
 
@@ -237,8 +243,15 @@ def get_attendance_by_class_and_date_range(db: Session, class_id: int, start_dat
 def get_attendance_by_student(db: Session, student_id: int, start_date: date = None, end_date: date = None) -> List[models.Attendance]:
     """Get attendance records for a specific student"""
     query = db.query(models.Attendance).filter(models.Attendance.student_id == student_id)
+    
+    from datetime import datetime
+    
     if start_date:
-        query = query.filter(func.date(models.Attendance.marked_at) >= start_date)
+        start_ts = datetime.combine(start_date, datetime.min.time())
+        query = query.filter(models.Attendance.marked_at >= start_ts)
+        
     if end_date:
-        query = query.filter(func.date(models.Attendance.marked_at) <= end_date)
+        end_ts = datetime.combine(end_date, datetime.max.time())
+        query = query.filter(models.Attendance.marked_at <= end_ts)
+        
     return query.all()

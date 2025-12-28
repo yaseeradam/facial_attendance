@@ -343,7 +343,26 @@ class _RegisterStudentScreenNewState extends State<RegisterStudentScreenNew>
     setState(() => _isRegistering = true);
 
     try {
-      // Use the first captured face for registration (or you could use all 3)
+      // 1. Check if face is already registered
+      final verifyResult = await ApiService.verifyFace(
+        imageFile: File(_capturedFaces[0].path),
+      );
+
+      if (verifyResult['success'] == true && verifyResult['data']['success'] == true) {
+        if (!mounted) return;
+        final studentName = verifyResult['data']['student_name'];
+        final studentId = verifyResult['data']['student_id'];
+        
+        // Show specific error for duplicate face
+        UIHelpers.showError(
+          context, 
+          "This person is already registered as:\n$studentName (ID: $studentId)",
+        );
+        setState(() => _isRegistering = false);
+        return;
+      }
+
+      // 2. Proceed with registration if face is not found
       final result = await ApiService.registerStudent(
         studentId: _studentIdController.text,
         name: _nameController.text,

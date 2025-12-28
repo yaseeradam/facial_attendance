@@ -283,25 +283,49 @@ class _ScanAttendanceScreenState extends State<ScanAttendanceScreen>
   Future<void> _confirmAttendance() async {
     if (_recognizedStudent == null || _recognizedStudent!['class_id'] == null) return;
     
+    // Double check if already marked (prevent UI race condition)
+    if (_recognizedStudent!['attendance_marked'] == true) {
+      if (mounted) {
+        UIHelpers.showWarning(context, "Attendance already marked for today");
+      }
+      return;
+    }
+    
     try {
       setState(() => _isScanning = true); // Show loading
       
-      await ApiService.markAttendance({
+      final result = await ApiService.markAttendance({
         'student_id': _recognizedStudent!['student_id'],
         'class_id': _recognizedStudent!['class_id'],
         'confidence_score': _recognizedStudent!['confidence_score'] ?? 0.0,
       });
       
-      // Success
       if (mounted) {
-        UIHelpers.showSuccess(context, "Attendance Confirmed!");
-        setState(() {
-          _recognizedStudent!['attendance_marked'] = true;
-          _isScanning = false;
-        });
-        
-        // Auto reset after success
-        Future.delayed(const Duration(seconds: 2), _resetScan);
+        if (result['success']) {
+          // Success
+          UIHelpers.showSuccess(context, "Attendance Confirmed!");
+          setState(() {
+            _recognizedStudent!['attendance_marked'] = true;
+            _isScanning = false;
+          });
+          
+          // Auto reset after success
+          Future.delayed(const Duration(seconds: 2), _resetScan);
+        } else {
+          // Check if error is about duplicate attendance
+          final errorMsg = result['error']?.toString().toLowerCase() ?? '';
+          if (errorMsg.contains('already marked') || errorMsg.contains('already present')) {
+            // Update UI to reflect already marked state
+            setState(() {
+              _recognizedStudent!['attendance_marked'] = true;
+              _isScanning = false;
+            });
+            UIHelpers.showWarning(context, "This student's attendance was already marked today");
+          } else {
+            setState(() => _isScanning = false);
+            UIHelpers.showError(context, result['error'] ?? "Failed to mark attendance");
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -606,13 +630,44 @@ class _ScanAttendanceScreenState extends State<ScanAttendanceScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Warning Banner if Already Marked
+          if (isMarked)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      "This student's attendance was already marked today",
+                      style: TextStyle(
+                        color: Colors.orange[700],
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
           // Student Profile
           Row(
             children: [
               Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.blueAccent, width: 2),
+                  border: Border.all(
+                    color: isMarked ? Colors.orange : Colors.blueAccent, 
+                    width: 2
+                  ),
                 ),
                 child: CircleAvatar(
                   radius: 32,
@@ -646,16 +701,29 @@ class _ScanAttendanceScreenState extends State<ScanAttendanceScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: isMarked 
+                        ? Colors.orange.withOpacity(0.1) 
+                        : Colors.green.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      isMarked ? "PRESENT" : "MATCH",
-                      style: const TextStyle(
-                        color: Colors.green, 
-                        fontWeight: FontWeight.bold, 
-                        fontSize: 12
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isMarked ? Icons.event_available : Icons.verified,
+                          size: 14,
+                          color: isMarked ? Colors.orange[700] : Colors.green,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isMarked ? "PRESENT" : "MATCH",
+                          style: TextStyle(
+                            color: isMarked ? Colors.orange[700] : Colors.green, 
+                            fontWeight: FontWeight.bold, 
+                            fontSize: 12
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -690,27 +758,36 @@ class _ScanAttendanceScreenState extends State<ScanAttendanceScreen>
               Expanded(
                 flex: 1,
                 child: OutlinedButton(
-                   onPressed: _resetScan, // Manual Entry placeholder -> just reset for now
+                   onPressed: _resetScan,
                    style: OutlinedButton.styleFrom(
                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                      padding: const EdgeInsets.symmetric(vertical: 16),
                    ),
-                   child: const Icon(Icons.refresh), // Changed to refresh for simplicity
+                   child: const Icon(Icons.refresh),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 flex: 2,
                 child: ElevatedButton.icon(
-                  onPressed: isMarked ? null : () => _confirmAttendance(),
-                  icon: const Icon(Icons.check_circle),
-                  label: Text(isMarked ? "Already Confirmed" : "Confirm Attendance"),
+                  onPressed: (isMarked || _isScanning) ? 
+                    null : 
+                    () => _confirmAttendance(),
+                  icon: _isScanning 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Icon(isMarked ? Icons.check_circle : Icons.check),
+                  label: Text(
+                    _isScanning ? "Processing..." :
+                    (isMarked ? "Already Present Today" : "Confirm Attendance")
+                  ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
+                    backgroundColor: isMarked ? Colors.grey : Colors.blueAccent,
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.withOpacity(0.5),
+                    disabledForegroundColor: Colors.white70,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    elevation: 4,
+                    elevation: isMarked ? 0 : 4,
                   ),
                 ),
               ),
