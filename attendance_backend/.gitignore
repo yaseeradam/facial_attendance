@@ -1,0 +1,47 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.venv/
+env/
+.env
+
+# Local development database
+*.db
+*.db-journal
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Uploads (handled by persistent storage in production)
+uploads/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# InsightFace model cache
+.insightface/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary files
+*.tmp
+*.temp

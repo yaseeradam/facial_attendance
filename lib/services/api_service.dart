@@ -3,12 +3,12 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'storage_service.dart';
+import '../config/api_config.dart';
 
 class ApiService {
-  // For Android emulator use 10.0.2.2, for iOS simulator use localhost
-  // For physical device via USB: use localhost with adb reverse
-  // For physical device via WiFi: use computer's local IP
-  static const String baseUrl = 'http://192.168.43.70:8000'; // Network connection
+  // Use centralized API configuration for easy environment switching
+  // To switch to production: Update ApiConfig.useProduction to true
+  static String get baseUrl => ApiConfig.baseUrl;
   static String? _token;
 
   static Future<bool> _hasConnection() async {
