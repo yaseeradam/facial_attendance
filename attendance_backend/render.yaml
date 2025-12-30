@@ -10,6 +10,7 @@ databases:
 services:
   - type: web
     name: face-attendance-backend
+    rootDir: attendance_backend
     runtime: python
     plan: free
     buildCommand: |
