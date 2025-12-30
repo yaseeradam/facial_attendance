@@ -4,6 +4,7 @@ import 'student_details_screen.dart';
 import 'register_student_screen_new.dart';
 import '../services/api_service.dart';
 import '../utils/ui_helpers.dart';
+import '../utils/image_utils.dart';
 
 class StudentListScreen extends ConsumerStatefulWidget {
   const StudentListScreen({super.key});
@@ -243,7 +244,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                 ),
                 // Show photo if available
                 image: (imageUrl != null && imageUrl.isNotEmpty) ? DecorationImage(
-                  image: NetworkImage('${ApiService.baseUrl}/uploads/$imageUrl'),
+                  image: NetworkImage(ImageUtils.getFullImageUrl(imageUrl)),
                   fit: BoxFit.cover,
                   onError: (exception, stackTrace) {},
                 ) : null,

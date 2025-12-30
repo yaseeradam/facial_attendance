@@ -5,6 +5,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../utils/ui_helpers.dart';
+import '../utils/image_utils.dart'; // Add this import
 
 class ScanAttendanceScreen extends StatefulWidget {
   const ScanAttendanceScreen({super.key});
@@ -672,7 +673,7 @@ class _ScanAttendanceScreenState extends State<ScanAttendanceScreen>
                 child: CircleAvatar(
                   radius: 32,
                   backgroundImage: photoPath != null 
-                     ? NetworkImage('${ApiService.baseUrl}/uploads/$photoPath')
+                     ? NetworkImage(ImageUtils.getFullImageUrl(photoPath))
                      : null,
                   child: photoPath == null ? const Icon(Icons.person) : null,
                 ),
