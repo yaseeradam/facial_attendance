@@ -9,7 +9,8 @@ import numpy as np
 import os
 import uuid
 
-from .image_service import ImageService
+# Directory to save student photos
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads", "students")
 
 class FaceService:
     def __init__(self):
@@ -38,10 +39,11 @@ class FaceService:
             if not is_valid:
                 return False, message
             
-            # Save the photo (Cloudinary or Local)
-            photo_path_or_url = ImageService.save_image(image_data, student_id)
-            if not photo_path_or_url:
-                return False, "Failed to save student photo"
+            # Save the photo as student profile picture
+            photo_filename = f"{student_id}_{uuid.uuid4().hex[:8]}.jpg"
+            photo_path = os.path.join(UPLOAD_DIR, photo_filename)
+            with open(photo_path, 'wb') as f:
+                f.write(image_data)
             
             # Preprocess image
             image = preprocess_image(image_data)
@@ -78,7 +80,7 @@ class FaceService:
             crud.create_face_embedding(db, student_id, embedding_json)
             
             # Update student face_enrolled status and photo_path
-            crud.update_student_face_enrolled(db, student_id, True, photo_path=photo_path_or_url)
+            crud.update_student_face_enrolled(db, student_id, True, photo_path=f"students/{photo_filename}")
             
             return True, "Face registered successfully"
             

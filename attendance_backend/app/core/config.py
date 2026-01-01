@@ -18,12 +18,6 @@ class Settings(BaseSettings):
     app_name: str = "Face Recognition Attendance System"
     debug: bool = False
     
-    # Cloudinary (Optional - for persistent storage in free tier)
-    # If not provided, will default to local storage (which is ephemeral on Render free tier)
-    cloudinary_cloud_name: str = ""
-    cloudinary_api_key: str = ""
-    cloudinary_api_secret: str = ""
-    
     class Config:
         env_file = ".env"
 

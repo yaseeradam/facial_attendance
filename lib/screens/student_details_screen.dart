@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/api_service.dart';
 import 'package:camera/camera.dart';
 import 'dart:io';
-import '../utils/image_utils.dart';
 
 class StudentDetailsScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> student;
@@ -172,7 +171,7 @@ class _StudentDetailsScreenState extends ConsumerState<StudentDetailsScreen> {
                             child: ClipOval(
                               child: _student['photo_path'] != null && _student['photo_path'].toString().isNotEmpty
                                 ? Image.network(
-                                    ImageUtils.getFullImageUrl(_student['photo_path']),
+                                    "${ApiService.baseUrl}/uploads/${_student['photo_path']}",
                                     fit: BoxFit.cover,
                                     errorBuilder: (c, o, s) => const Icon(Icons.person, size: 60, color: Colors.grey),
                                   )
