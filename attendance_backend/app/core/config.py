@@ -1,4 +1,5 @@
 """App settings and configuration"""
+from typing import Optional
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -17,6 +18,9 @@ class Settings(BaseSettings):
     # App
     app_name: str = "Face Recognition Attendance System"
     debug: bool = False
+    
+    # Cloudinary (optional)
+    cloudinary_url: Optional[str] = None
     
     class Config:
         env_file = ".env"
