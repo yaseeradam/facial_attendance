@@ -4,7 +4,7 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies required for OpenCV and InsightFace
+# Install system dependencies required for OpenCV, InsightFace, and building packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libgl1 \
@@ -13,8 +13,14 @@ RUN apt-get update && \
     libxext6 \
     libxrender1 \
     libgomp1 \
+    build-essential \
+    gcc \
+    g++ \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and install build tools
+RUN pip install --upgrade pip setuptools wheel
 
 # Copy requirements first for better caching
 COPY requirements.txt .
